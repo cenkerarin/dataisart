@@ -1,4 +1,4 @@
-# Hands-Free Data Science 🧠🖐️
+# Hands-Free Data Science
 
 Interact with datasets using your **hands and voice** — no code, no clicks.  
 This project lets you explore and visualize datasets (like Kaggle CSVs) through **hand gestures and natural language commands**, powered by **Computer Vision** and **Large Language Models (LLMs)**.
