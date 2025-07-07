@@ -1,0 +1,40 @@
+{
+  "hands_detected": true,
+  "hands": [
+    {
+      "landmarks": [
+        {
+          "id": 0,
+          "x": 640,
+          "y": 360,
+          "z": 0.0,
+          "visibility": 1.0
+        }
+      ],
+      "landmarks_normalized": [
+        {
+          "id": 0,
+          "x": 0.5,
+          "y": 0.5,
+          "z": 0.0,
+          "visibility": 1.0
+        }
+      ],
+      "handedness": {
+        "label": "Right",
+        "score": 0.9876
+      },
+      "bounding_box": {
+        "x": 580,
+        "y": 300,
+        "width": 120,
+        "height": 140
+      }
+    }
+  ],
+  "frame_shape": [
+    720,
+    1280,
+    3
+  ]
+}
