@@ -289,17 +289,69 @@ class GestureClassifier:
         
         return landmarks
     
-    def train(self, features: Optional[np.ndarray] = None, labels: Optional[np.ndarray] = None):
+    def load_real_training_data(self, data_file: str) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Load real training data from collected gesture samples.
+        
+        Args:
+            data_file: Path to JSON file with collected gesture data
+            
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: Features and labels
+        """
+        import json
+        
+        with open(data_file, 'r') as f:
+            data = json.load(f)
+        
+        features = []
+        labels = []
+        
+        # Map gesture names to IDs
+        gesture_name_to_id = {name: id for id, name in self.gesture_labels.items()}
+        
+        for gesture_name, samples in data["data"].items():
+            if gesture_name not in gesture_name_to_id:
+                logger.warning(f"Unknown gesture in data: {gesture_name}")
+                continue
+            
+            gesture_id = gesture_name_to_id[gesture_name]
+            
+            for sample in samples:
+                try:
+                    landmarks = sample["landmarks"]
+                    feature_vector = self.extract_features(landmarks)
+                    features.append(feature_vector)
+                    labels.append(gesture_id)
+                except Exception as e:
+                    logger.warning(f"Error processing sample for {gesture_name}: {e}")
+                    continue
+        
+        if len(features) == 0:
+            logger.warning("No valid samples found. Using synthetic data.")
+            return self.create_training_data()
+        
+        logger.info(f"Loaded {len(features)} real samples from {len(set(labels))} gesture classes")
+        return np.array(features), np.array(labels)
+    
+    def train(self, features: Optional[np.ndarray] = None, labels: Optional[np.ndarray] = None, 
+              data_file: str = "./gesture_data/training_data.json"):
         """
         Train the gesture classifier.
         
         Args:
-            features: Training features (if None, uses synthetic data)
-            labels: Training labels (if None, uses synthetic data)
+            features: Training features (if None, tries to load real data)
+            labels: Training labels (if None, tries to load real data)
+            data_file: Path to real gesture data file
         """
         if features is None or labels is None:
-            logger.info("Generating synthetic training data...")
-            features, labels = self.create_training_data()
+            # Try to load real data first
+            if os.path.exists(data_file):
+                logger.info(f"Loading real training data from {data_file}...")
+                features, labels = self.load_real_training_data(data_file)
+            else:
+                logger.info("No real training data found. Generating synthetic training data...")
+                features, labels = self.create_training_data()
         
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(
