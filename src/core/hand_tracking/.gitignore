@@ -1,8 +1,0 @@
-venv-py311/
-__pycache__/
-*.pyc
-*.pkl
-*.joblib
-*.model
-test_gesture_model.pkl
-hand_data_*.json
