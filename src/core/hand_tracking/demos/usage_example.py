@@ -8,6 +8,7 @@ Simple example showing how to use the GestureDetector module for various applica
 import cv2
 import numpy as np
 from core.gesture_detector import GestureDetector
+from core.gesture_classifier import GestureClassifier
 from typing import Dict, Any, List
 
 class HandTrackingApp:
@@ -15,6 +16,7 @@ class HandTrackingApp:
     
     def __init__(self):
         self.detector = GestureDetector()
+        self.gesture_classifier = GestureClassifier(model_type='knn')
         self.is_initialized = False
         
     def initialize(self) -> bool:
@@ -26,8 +28,16 @@ class HandTrackingApp:
             "min_tracking_confidence": 0.5
         }
         
-        self.is_initialized = self.detector.initialize(config)
-        return self.is_initialized
+        # Initialize hand detector
+        if not self.detector.initialize(config):
+            return False
+        
+        # Train gesture classifier
+        print("Training gesture classifier...")
+        self.gesture_classifier.train()
+        
+        self.is_initialized = True
+        return True
     
     def process_frame(self, frame: np.ndarray) -> Dict[str, Any]:
         """
@@ -65,6 +75,7 @@ class HandTrackingApp:
                 
                 # Add custom analysis
                 hand_info["gesture_analysis"] = self.analyze_hand_pose(hand_data["landmarks"])
+                hand_info["ml_gesture"] = self.gesture_classifier.predict_gesture(hand_data["landmarks"])
                 hand_info["hand_center"] = self.calculate_hand_center(hand_data["landmarks"])
                 
                 processed_data["hands_data"].append(hand_info)
@@ -185,7 +196,8 @@ def run_simple_demo():
         print("Could not open camera")
         return
     
-    print("Simple Hand Tracking Demo")
+    print("Enhanced Hand Tracking Demo with ML Gesture Classification")
+    print("Shows both hands with trained gesture recognition")
     print("Press 'q' to quit")
     
     try:
@@ -203,22 +215,29 @@ def run_simple_demo():
             # Display results
             if results.get("hands_count", 0) > 0:
                 for hand_data in results["hands_data"]:
-                    gesture = hand_data["gesture_analysis"]["gesture_detected"]
+                    # Get both basic and ML gesture results
+                    basic_gesture = hand_data["gesture_analysis"]["gesture_detected"]
+                    ml_gesture = hand_data["ml_gesture"]["gesture"]
+                    ml_confidence = hand_data["ml_gesture"]["confidence"]
                     fingers = hand_data["gesture_analysis"]["fingers_extended"]
                     handedness = hand_data["handedness"]
                     
-                    print(f"\r{handedness} hand: {fingers} fingers, gesture: {gesture}     ", end="")
+                    print(f"\r{handedness} hand: {fingers} fingers, ML gesture: {ml_gesture} ({ml_confidence:.2f})     ", end="")
                     
                     # Draw on frame
                     bbox = hand_data["bounding_box"]
+                    color = (0, 255, 0) if handedness == "Right" else (255, 0, 0)
                     cv2.rectangle(frame, (bbox["x"], bbox["y"]), 
                                 (bbox["x"] + bbox["width"], bbox["y"] + bbox["height"]), 
-                                (0, 255, 0), 2)
+                                color, 2)
                     
-                    # Draw gesture label
-                    label = f"{handedness}: {gesture or 'none'}"
-                    cv2.putText(frame, label, (bbox["x"], bbox["y"] - 10),
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                    # Draw ML gesture label
+                    label = f"{handedness}: {ml_gesture}"
+                    confidence_text = f"({ml_confidence:.2f})"
+                    cv2.putText(frame, label, (bbox["x"], bbox["y"] - 30),
+                              cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+                    cv2.putText(frame, confidence_text, (bbox["x"], bbox["y"] - 10),
+                              cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
             else:
                 print(f"\rNo hands detected     ", end="")
             

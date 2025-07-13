@@ -23,7 +23,7 @@ class GestureRecognitionDemo:
     def __init__(self):
         """Initialize the demo with hand tracking and gesture classification."""
         self.hand_detector = GestureDetector()
-        self.gesture_classifier = GestureClassifier(model_type='knn', temporal_window=10)
+        self.gesture_classifier = GestureClassifier(model_type='knn')
         self.is_initialized = False
         
         # Demo statistics
@@ -42,7 +42,7 @@ class GestureRecognitionDemo:
         # Initialize hand detector
         hand_config = {
             "static_image_mode": False,
-            "max_num_hands": 1,  # Focus on single hand for better performance
+            "max_num_hands": 2,  # Enable detection of both hands
             "min_detection_confidence": 0.7,
             "min_tracking_confidence": 0.6
         }
@@ -107,7 +107,7 @@ class GestureRecognitionDemo:
                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             return annotated_frame
         
-        for result in results["gesture_results"]:
+        for hand_index, result in enumerate(results["gesture_results"]):
             handedness = result["handedness"]
             bbox = result["bounding_box"]
             landmarks = result["landmarks"]
@@ -133,9 +133,9 @@ class GestureRecognitionDemo:
             # Draw gesture information
             self._draw_gesture_info(annotated_frame, bbox, handedness, gesture_info)
             
-            # Draw probabilities if enabled
+            # Draw probabilities if enabled (positioned per hand to avoid overlap)
             if self.show_probabilities and gesture_info.get("probabilities"):
-                self._draw_probabilities(annotated_frame, gesture_info["probabilities"])
+                self._draw_probabilities(annotated_frame, gesture_info["probabilities"], hand_index)
         
         return annotated_frame
     
@@ -196,12 +196,13 @@ class GestureRecognitionDemo:
         cv2.putText(frame, type_indicator, (bbox["x"] + bbox["width"] - 80, label_y),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
     
-    def _draw_probabilities(self, frame, probabilities: Dict[str, float]):
+    def _draw_probabilities(self, frame, probabilities: Dict[str, float], hand_index: int = 0):
         """Draw gesture probabilities sidebar."""
-        y_start = 100
+        y_start = 100 + (hand_index * 160)  # Offset by hand index to avoid overlap
         x_pos = frame.shape[1] - 200
         
-        cv2.putText(frame, "Probabilities:", (x_pos, y_start - 20),
+        hand_label = f"Hand {hand_index + 1} Probabilities:"
+        cv2.putText(frame, hand_label, (x_pos, y_start - 20),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
         
         sorted_probs = sorted(probabilities.items(), key=lambda x: x[1], reverse=True)

@@ -16,7 +16,6 @@ import numpy as np
 import pickle
 import os
 from typing import Dict, List, Optional, Tuple, Any
-from collections import deque
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.preprocessing import StandardScaler
@@ -29,16 +28,14 @@ logger = logging.getLogger(__name__)
 class GestureClassifier:
     """ML-based gesture classifier for hand landmarks."""
     
-    def __init__(self, model_type='knn', temporal_window=10):
+    def __init__(self, model_type='knn'):
         """
         Initialize the gesture classifier.
         
         Args:
             model_type (str): Type of ML model ('knn', 'rf')
-            temporal_window (int): Number of frames for temporal analysis
         """
         self.model_type = model_type
-        self.temporal_window = temporal_window
         self.model = None
         self.scaler = StandardScaler()
         self.is_trained = False
@@ -53,14 +50,6 @@ class GestureClassifier:
             5: 'peace_sign',
             6: 'thumbs_up'
         }
-        
-        # Temporal buffer for swipe detection
-        self.landmark_history = deque(maxlen=self.temporal_window)
-        self.hand_center_history = deque(maxlen=self.temporal_window)
-        
-        # Swipe detection parameters
-        self.swipe_threshold = 50  # pixels
-        self.min_swipe_frames = 5
         
         self._initialize_model()
     
@@ -402,18 +391,6 @@ class GestureClassifier:
             
             gesture_name = self.gesture_labels.get(prediction, "unknown")
             
-            # Update temporal history for swipe detection
-            self._update_temporal_history(landmarks)
-            
-            # Check for swipe gestures
-            swipe_result = self._detect_swipe()
-            if swipe_result["detected"]:
-                return {
-                    "gesture": swipe_result["direction"],
-                    "confidence": swipe_result["confidence"],
-                    "type": "temporal"
-                }
-            
             return {
                 "gesture": gesture_name,
                 "confidence": float(confidence),
@@ -426,47 +403,7 @@ class GestureClassifier:
             logger.error(f"Error in gesture prediction: {str(e)}")
             return {"gesture": "error", "confidence": 0.0, "error": str(e)}
     
-    def _update_temporal_history(self, landmarks: List[Dict[str, float]]):
-        """Update temporal history for swipe detection."""
-        self.landmark_history.append(landmarks)
-        
-        # Calculate hand center
-        x_coords = [lm['x'] for lm in landmarks]
-        y_coords = [lm['y'] for lm in landmarks]
-        center = {
-            'x': sum(x_coords) / len(x_coords),
-            'y': sum(y_coords) / len(y_coords)
-        }
-        self.hand_center_history.append(center)
-    
-    def _detect_swipe(self) -> Dict[str, Any]:
-        """Detect swipe gestures from temporal data."""
-        if len(self.hand_center_history) < self.min_swipe_frames:
-            return {"detected": False}
-        
-        # Calculate movement
-        centers = list(self.hand_center_history)
-        start_center = centers[0]
-        end_center = centers[-1]
-        
-        dx = end_center['x'] - start_center['x']
-        dy = end_center['y'] - start_center['y']
-        
-        # Check for horizontal swipe
-        if abs(dx) > self.swipe_threshold and abs(dx) > abs(dy) * 2:
-            direction = "swipe_right" if dx > 0 else "swipe_left"
-            confidence = min(abs(dx) / (self.swipe_threshold * 2), 1.0)
-            
-            # Clear history after detection
-            self.hand_center_history.clear()
-            
-            return {
-                "detected": True,
-                "direction": direction,
-                "confidence": confidence
-            }
-        
-        return {"detected": False}
+
     
     def add_gesture(self, gesture_name: str, gesture_id: int):
         """
@@ -527,6 +464,5 @@ class GestureClassifier:
             "supported_gestures": list(self.gesture_labels.values()),
             "model_type": self.model_type,
             "is_trained": self.is_trained,
-            "temporal_window": self.temporal_window,
             "total_gestures": len(self.gesture_labels)
         } 
