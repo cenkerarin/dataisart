@@ -23,7 +23,11 @@ class GestureRecognitionDemo:
     def __init__(self):
         """Initialize the demo with hand tracking and gesture classification."""
         self.hand_detector = GestureDetector()
-        self.gesture_classifier = GestureClassifier(model_type='knn')
+        self.gesture_classifier = GestureClassifier(
+            model_type='knn', 
+            use_feature_selection=True, 
+            n_features=50
+        )
         self.is_initialized = False
         
         # Demo statistics

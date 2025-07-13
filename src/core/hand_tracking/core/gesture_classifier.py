@@ -18,9 +18,10 @@ import os
 from typing import Dict, List, Optional, Tuple, Any
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
 from sklearn.metrics import classification_report, accuracy_score
+from sklearn.feature_selection import SelectKBest, f_classif
 import logging
 
 logger = logging.getLogger(__name__)
@@ -28,16 +29,20 @@ logger = logging.getLogger(__name__)
 class GestureClassifier:
     """ML-based gesture classifier for hand landmarks."""
     
-    def __init__(self, model_type='knn'):
+    def __init__(self, model_type='knn', use_feature_selection=True, n_features=50):
         """
         Initialize the gesture classifier.
         
         Args:
             model_type (str): Type of ML model ('knn', 'rf')
+            use_feature_selection (bool): Whether to use feature selection
+            n_features (int): Number of features to select (if using feature selection)
         """
         self.model_type = model_type
         self.model = None
         self.scaler = StandardScaler()
+        self.feature_selector = SelectKBest(f_classif, k=n_features) if use_feature_selection else None
+        self.use_feature_selection = use_feature_selection
         self.is_trained = False
         
         # Gesture definitions
@@ -56,7 +61,13 @@ class GestureClassifier:
     def _initialize_model(self):
         """Initialize the ML model based on model_type."""
         if self.model_type == 'knn':
-            self.model = KNeighborsClassifier(n_neighbors=5, weights='distance')
+            # Use optimized parameters for better accuracy
+            self.model = KNeighborsClassifier(
+                n_neighbors=7,  # Slightly higher k for better generalization
+                weights='distance',  # Distance weighting
+                metric='minkowski',  # Minkowski distance
+                p=2  # Euclidean distance
+            )
         elif self.model_type == 'rf':
             self.model = RandomForestClassifier(n_estimators=100, random_state=42)
         else:
@@ -97,6 +108,10 @@ class GestureClassifier:
         # Finger extension features
         finger_extensions = self._calculate_finger_extensions(landmarks)
         features.extend(finger_extensions)
+        
+        # Additional discriminative features
+        advanced_features = self._calculate_advanced_features(landmarks)
+        features.extend(advanced_features)
         
         return np.array(features)
     
@@ -202,6 +217,98 @@ class GestureClassifier:
         # Thumb extension is more about distance from palm
         distance = np.sqrt((tip['x'] - cmc['x'])**2 + (tip['y'] - cmc['y'])**2)
         return min(distance / 50.0, 1.0)  # Normalize
+    
+    def _calculate_advanced_features(self, landmarks: List[Dict[str, float]]) -> List[float]:
+        """Calculate advanced discriminative features for better accuracy."""
+        features = []
+        
+        # 1. Palm area (convex hull of palm landmarks)
+        palm_landmarks = [0, 1, 5, 9, 13, 17]  # Key palm points
+        palm_area = self._calculate_convex_hull_area([landmarks[i] for i in palm_landmarks])
+        features.append(palm_area)
+        
+        # 2. Finger spread angles (between adjacent fingers)
+        finger_bases = [5, 9, 13, 17]  # Index, Middle, Ring, Pinky bases
+        for i in range(len(finger_bases) - 1):
+            angle = self._calculate_angle_between_points(
+                landmarks[finger_bases[i]], 
+                landmarks[0],  # wrist
+                landmarks[finger_bases[i + 1]]
+            )
+            features.append(angle)
+        
+        # 3. Finger length ratios
+        finger_lengths = []
+        finger_segments = [
+            [5, 6, 7, 8],    # Index
+            [9, 10, 11, 12], # Middle
+            [13, 14, 15, 16], # Ring
+            [17, 18, 19, 20] # Pinky
+        ]
+        
+        for segments in finger_segments:
+            length = 0
+            for i in range(len(segments) - 1):
+                p1 = landmarks[segments[i]]
+                p2 = landmarks[segments[i + 1]]
+                length += np.sqrt((p1['x'] - p2['x'])**2 + (p1['y'] - p2['y'])**2)
+            finger_lengths.append(length)
+        
+        # Add finger length ratios
+        for i in range(len(finger_lengths) - 1):
+            ratio = finger_lengths[i] / (finger_lengths[i + 1] + 1e-8)
+            features.append(ratio)
+        
+        # 4. Hand orientation (angle of palm)
+        wrist = landmarks[0]
+        middle_mcp = landmarks[9]
+        orientation = np.arctan2(middle_mcp['y'] - wrist['y'], middle_mcp['x'] - wrist['x'])
+        features.append(orientation)
+        
+        # 5. Finger curvature (angle between finger segments)
+        for segments in finger_segments:
+            if len(segments) >= 3:
+                curvature = self._calculate_angle_between_points(
+                    landmarks[segments[0]], 
+                    landmarks[segments[1]], 
+                    landmarks[segments[2]]
+                )
+                features.append(curvature)
+        
+        # 6. Thumb-finger distances (important for pinch detection)
+        thumb_tip = landmarks[4]
+        for finger_tip in [8, 12, 16, 20]:  # Other finger tips
+            tip = landmarks[finger_tip]
+            distance = np.sqrt((thumb_tip['x'] - tip['x'])**2 + 
+                              (thumb_tip['y'] - tip['y'])**2)
+            features.append(distance)
+        
+        # 7. Bounding box ratio (width/height)
+        x_coords = [lm['x'] for lm in landmarks]
+        y_coords = [lm['y'] for lm in landmarks]
+        width = max(x_coords) - min(x_coords)
+        height = max(y_coords) - min(y_coords)
+        aspect_ratio = width / (height + 1e-8)
+        features.append(aspect_ratio)
+        
+        return features
+    
+    def _calculate_convex_hull_area(self, points: List[Dict[str, float]]) -> float:
+        """Calculate area of convex hull for given points."""
+        if len(points) < 3:
+            return 0.0
+        
+        # Simple approximation using shoelace formula
+        coords = [(p['x'], p['y']) for p in points]
+        n = len(coords)
+        area = 0.0
+        
+        for i in range(n):
+            j = (i + 1) % n
+            area += coords[i][0] * coords[j][1]
+            area -= coords[j][0] * coords[i][1]
+        
+        return abs(area) / 2.0
     
     def create_training_data(self) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -324,14 +431,17 @@ class GestureClassifier:
         return np.array(features), np.array(labels)
     
     def train(self, features: Optional[np.ndarray] = None, labels: Optional[np.ndarray] = None, 
-              data_file: str = "data/gesture_data/training_data.json"):
+              data_file: str = "data/gesture_data/training_data.json", 
+              use_hyperparameter_tuning: bool = True, use_data_augmentation: bool = True):
         """
-        Train the gesture classifier.
+        Train the gesture classifier with enhanced accuracy improvements.
         
         Args:
             features: Training features (if None, tries to load real data)
             labels: Training labels (if None, tries to load real data)
             data_file: Path to real gesture data file
+            use_hyperparameter_tuning: Whether to use grid search for hyperparameters
+            use_data_augmentation: Whether to augment training data
         """
         if features is None or labels is None:
             # Try to load real data first
@@ -342,6 +452,11 @@ class GestureClassifier:
                 logger.info("No real training data found. Generating synthetic training data...")
                 features, labels = self.create_training_data()
         
+        # Data augmentation
+        if use_data_augmentation:
+            logger.info("Applying data augmentation...")
+            features, labels = self._augment_data(features, labels)
+        
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(
             features, labels, test_size=0.2, random_state=42, stratify=labels
@@ -351,20 +466,93 @@ class GestureClassifier:
         X_train_scaled = self.scaler.fit_transform(X_train)
         X_test_scaled = self.scaler.transform(X_test)
         
+        # Feature selection
+        if self.use_feature_selection and self.feature_selector is not None:
+            logger.info("Applying feature selection...")
+            X_train_scaled = self.feature_selector.fit_transform(X_train_scaled, y_train)
+            X_test_scaled = self.feature_selector.transform(X_test_scaled)
+        
+        # Hyperparameter tuning
+        if use_hyperparameter_tuning and self.model_type == 'knn':
+            logger.info("Performing hyperparameter tuning...")
+            self._tune_hyperparameters(X_train_scaled, y_train)
+        
         # Train model
         logger.info(f"Training {self.model_type} model...")
         self.model.fit(X_train_scaled, y_train)
+        
+        # Cross-validation
+        cv_scores = cross_val_score(self.model, X_train_scaled, y_train, cv=5)
+        logger.info(f"Cross-validation scores: {cv_scores}")
+        logger.info(f"Cross-validation mean: {cv_scores.mean():.3f} (+/- {cv_scores.std() * 2:.3f})")
         
         # Evaluate
         y_pred = self.model.predict(X_test_scaled)
         accuracy = accuracy_score(y_test, y_pred)
         
-        logger.info(f"Model trained with accuracy: {accuracy:.3f}")
+        logger.info(f"Model trained with test accuracy: {accuracy:.3f}")
         logger.info("\nClassification Report:")
         logger.info(classification_report(y_test, y_pred, 
                                         target_names=list(self.gesture_labels.values())))
         
         self.is_trained = True
+    
+    def _tune_hyperparameters(self, X_train: np.ndarray, y_train: np.ndarray):
+        """Perform hyperparameter tuning using grid search."""
+        if self.model_type == 'knn':
+            param_grid = {
+                'n_neighbors': [3, 5, 7, 9, 11],
+                'weights': ['uniform', 'distance'],
+                'metric': ['minkowski', 'manhattan', 'chebyshev'],
+                'p': [1, 2]  # For minkowski distance
+            }
+            
+            grid_search = GridSearchCV(
+                KNeighborsClassifier(),
+                param_grid,
+                cv=5,
+                scoring='accuracy',
+                n_jobs=-1
+            )
+            
+            grid_search.fit(X_train, y_train)
+            
+            # Update model with best parameters
+            self.model = grid_search.best_estimator_
+            logger.info(f"Best parameters: {grid_search.best_params_}")
+            logger.info(f"Best cross-validation score: {grid_search.best_score_:.3f}")
+    
+    def _augment_data(self, features: np.ndarray, labels: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """Augment training data to improve robustness."""
+        augmented_features = []
+        augmented_labels = []
+        
+        # Keep original data
+        augmented_features.append(features)
+        augmented_labels.append(labels)
+        
+        # Add noise augmentation
+        noise_levels = [0.01, 0.02, 0.03]
+        for noise_level in noise_levels:
+            noise = np.random.normal(0, noise_level, features.shape)
+            noisy_features = features + noise
+            augmented_features.append(noisy_features)
+            augmented_labels.append(labels)
+        
+        # Add scaling augmentation
+        scale_factors = [0.95, 1.05]
+        for scale_factor in scale_factors:
+            scaled_features = features * scale_factor
+            augmented_features.append(scaled_features)
+            augmented_labels.append(labels)
+        
+        # Combine all augmented data
+        final_features = np.vstack(augmented_features)
+        final_labels = np.hstack(augmented_labels)
+        
+        logger.info(f"Data augmentation: {len(features)} -> {len(final_features)} samples")
+        
+        return final_features, final_labels
     
     def predict_gesture(self, landmarks: List[Dict[str, float]]) -> Dict[str, Any]:
         """
@@ -383,6 +571,10 @@ class GestureClassifier:
             # Extract features
             features = self.extract_features(landmarks)
             features_scaled = self.scaler.transform(features.reshape(1, -1))
+            
+            # Apply feature selection if enabled
+            if self.use_feature_selection and self.feature_selector is not None:
+                features_scaled = self.feature_selector.transform(features_scaled)
             
             # Predict
             prediction = self.model.predict(features_scaled)[0]

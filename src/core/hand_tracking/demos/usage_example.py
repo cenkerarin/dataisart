@@ -16,7 +16,11 @@ class HandTrackingApp:
     
     def __init__(self):
         self.detector = GestureDetector()
-        self.gesture_classifier = GestureClassifier(model_type='knn')
+        self.gesture_classifier = GestureClassifier(
+            model_type='knn', 
+            use_feature_selection=True, 
+            n_features=50
+        )
         self.is_initialized = False
         
     def initialize(self) -> bool:
