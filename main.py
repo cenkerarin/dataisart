@@ -18,7 +18,7 @@ sys.path.insert(0, str(src_path))
 # Import core modules
 from ui.pages.main_dashboard import MainDashboard
 from core.data_processing.data_manager import DataManager
-from core.hand_tracking.gesture_detector import GestureDetector
+from core.hand_tracking.core.gesture_detector import GestureDetector
 from core.voice_recognition.voice_handler import VoiceHandler
 from core.llm_integration.ai_assistant import AIAssistant
 from utils.helpers.config_loader import load_config
