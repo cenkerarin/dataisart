@@ -106,9 +106,10 @@ class MainWindow(QMainWindow):
     
     def setup_connections(self):
         """Setup signal connections between components."""
-        # Connect camera panel gesture signals to data panel
+        # Connect camera panel gesture signals to data panel for gesture-based data control
         if hasattr(self.camera_panel, 'gesture_detected'):
             self.camera_panel.gesture_detected.connect(self.data_panel.handle_gesture)
+            print("✅ Connected gesture detection to data panel")
         
         # Connect data panel status updates to status bar
         if hasattr(self.data_panel, 'status_updated'):
@@ -129,6 +130,10 @@ class MainWindow(QMainWindow):
         # Cleanup camera resources
         if self.camera_panel:
             self.camera_panel.cleanup()
+        
+        # Cleanup data panel resources  
+        if self.data_panel:
+            self.data_panel.cleanup()
         
         # Stop update timer
         if self.update_timer:
