@@ -21,9 +21,27 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(src_path))
 
-# Import gesture detection modules using correct path
-from core.hand_tracking.core.gesture_detector import GestureDetector
-from core.hand_tracking.core.gesture_classifier import GestureClassifier
+# Also add the hand_tracking directory for direct imports
+hand_tracking_path = src_path / "core" / "hand_tracking"
+sys.path.insert(0, str(hand_tracking_path))
+
+# Try multiple import strategies for robustness
+try:
+    # First try: direct import from hand_tracking directory
+    from core.gesture_detector import GestureDetector
+    from core.gesture_classifier_adapter import GestureClassifier
+    print("✅ Using direct imports from hand_tracking directory")
+except ImportError:
+    try:
+        # Second try: full path import
+        from core.hand_tracking.core.gesture_detector import GestureDetector
+        from core.hand_tracking.core.gesture_classifier_adapter import GestureClassifier
+        print("✅ Using full path imports")
+    except ImportError:
+        # Fallback: basic functionality without enhanced features
+        print("⚠️  Enhanced gesture classifier not available - using basic mode")
+        GestureDetector = None
+        GestureClassifier = None
 
 
 class CameraWorker(QThread):

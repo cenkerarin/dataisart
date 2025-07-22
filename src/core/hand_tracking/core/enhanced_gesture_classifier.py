@@ -139,6 +139,9 @@ class EnhancedGestureClassifier:
         if len(landmarks) != 21:
             raise ValueError(f"Expected 21 landmarks, got {len(landmarks)}")
         
+        # Clean landmarks to prevent NaN issues
+        landmarks = self._clean_landmarks_enhanced(landmarks)
+        
         features = []
         
         # 1. Normalized coordinate features (relative to palm center and wrist)
@@ -182,7 +185,38 @@ class EnhancedGestureClassifier:
         topological_features = self._calculate_topological_features(landmarks)
         features.extend(topological_features)
         
-        return np.array(features)
+        # Final cleanup - replace any remaining NaN or infinite values
+        features = np.array(features)
+        features = np.nan_to_num(features, nan=0.0, posinf=1.0, neginf=-1.0)
+        
+        return features
+    
+    def _clean_landmarks_enhanced(self, landmarks: List[Dict[str, float]]) -> List[Dict[str, float]]:
+        """Clean landmarks to prevent NaN issues in feature extraction."""
+        cleaned = []
+        for i, landmark in enumerate(landmarks):
+            x = float(landmark.get('x', 100.0 + i * 10.0))
+            y = float(landmark.get('y', 200.0 + i * 5.0))
+            z = float(landmark.get('z', 0.0))
+            
+            # Replace NaN or infinite values
+            if not np.isfinite(x):
+                x = 100.0 + i * 10.0
+            if not np.isfinite(y):
+                y = 200.0 + i * 5.0
+            if not np.isfinite(z):
+                z = 0.0
+            
+            cleaned_landmark = {
+                'id': i,
+                'x': x,
+                'y': y,
+                'z': z,
+                'visibility': landmark.get('visibility', 1.0)
+            }
+            cleaned.append(cleaned_landmark)
+        
+        return cleaned
     
     def _calculate_palm_center(self, landmarks: List[Dict[str, float]]) -> Dict[str, float]:
         """Calculate the center of the palm."""
@@ -567,14 +601,31 @@ class EnhancedGestureClassifier:
     
     def _calculate_angle_between_points(self, p1: Dict, p2: Dict, p3: Dict) -> float:
         """Calculate angle between three points."""
-        v1 = np.array([p1['x'] - p2['x'], p1['y'] - p2['y'], p1['z'] - p2['z']])
-        v2 = np.array([p3['x'] - p2['x'], p3['y'] - p2['y'], p3['z'] - p2['z']])
-        
-        cos_angle = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2) + 1e-8)
-        cos_angle = np.clip(cos_angle, -1.0, 1.0)
-        angle = np.arccos(cos_angle)
-        
-        return np.degrees(angle)
+        try:
+            v1 = np.array([p1['x'] - p2['x'], p1['y'] - p2['y'], p1['z'] - p2['z']])
+            v2 = np.array([p3['x'] - p2['x'], p3['y'] - p2['y'], p3['z'] - p2['z']])
+            
+            # Check for zero vectors
+            norm1 = np.linalg.norm(v1)
+            norm2 = np.linalg.norm(v2)
+            
+            if norm1 < 1e-8 or norm2 < 1e-8:
+                return 90.0  # Default angle for degenerate cases
+            
+            cos_angle = np.dot(v1, v2) / (norm1 * norm2)
+            cos_angle = np.clip(cos_angle, -1.0, 1.0)
+            angle = np.arccos(cos_angle)
+            
+            result = np.degrees(angle)
+            
+            # Ensure result is finite
+            if not np.isfinite(result):
+                return 90.0
+                
+            return result
+            
+        except Exception:
+            return 90.0  # Safe fallback angle
     
     def load_enhanced_training_data(self, data_file: str) -> Tuple[np.ndarray, np.ndarray]:
         """Load enhanced training data with quality filtering."""
