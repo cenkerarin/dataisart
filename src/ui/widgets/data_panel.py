@@ -43,12 +43,19 @@ class DataPanel(QFrame):
         self.current_dataset = None
         
         # Gesture-based scrolling system
-        self.gesture_confidence_threshold = 0.95
-        self.gesture_hold_time = 1.0  # seconds
+        self.gesture_confidence_threshold = 0.75  # Lowered from 0.95 for better usability
+        self.gesture_hold_time = 0.4  # Reduced from 1.0 seconds for faster response
         self.current_gesture_data = {}
         self.gesture_start_time = None
         self.last_executed_gesture = None
-        self.scroll_smoothness = 5  # pixels per scroll step
+        self.scroll_smoothness = 8  # Increased scroll smoothness
+        
+        # Enhanced smoothing system
+        self.continuous_scrolling = False
+        self.scroll_timer = QTimer()
+        self.scroll_timer.timeout.connect(self.execute_continuous_scroll)
+        self.current_scroll_action = None
+        self.scroll_speed_multiplier = 1.0
         
         # Gesture action mappings
         self.gesture_actions = {
@@ -124,7 +131,7 @@ class DataPanel(QFrame):
             "🤏 Pinch → Scroll Up\n"
             "✋ Open Hand → Scroll Right\n"
             "✊ Fist → Scroll Left\n"
-            "(Need 95%+ confidence for 1 second)"
+            "(Need 75%+ confidence for 0.4s)"
         )
         gesture_instructions.setStyleSheet("""
             color: #888888; 
@@ -254,9 +261,10 @@ class DataPanel(QFrame):
             self.status_updated.emit(f"❌ Gesture handling error: {str(e)}")
     
     def process_gesture_queue(self):
-        """Process gesture data with confidence and timing requirements."""
+        """Process gesture data with enhanced smoothness and continuous scrolling."""
         try:
             if not self.current_gesture_data or self.current_dataset is None:
+                self.stop_continuous_scrolling()
                 return
                 
             gesture_name = self.current_gesture_data.get('gesture', 'unknown')
@@ -266,13 +274,18 @@ class DataPanel(QFrame):
             # Check if gesture is in our action mappings and meets confidence threshold
             if gesture_name in self.gesture_actions and confidence >= self.gesture_confidence_threshold:
                 
+                # Calculate scroll speed based on confidence (higher confidence = faster scroll)
+                self.scroll_speed_multiplier = min(2.0, confidence / 0.75)  # Max 2x speed
+                
                 # If this is a new high-confidence gesture, start timing
                 if (self.gesture_start_time is None or 
                     self.last_executed_gesture != gesture_name):
                     self.gesture_start_time = current_time
                     self.last_executed_gesture = gesture_name
-                    self.status_updated.emit(f"🖐️ Detected {gesture_name} ({confidence:.2f}) - Waiting...")
-                    self.gesture_status.setText(f"⏳ {gesture_name.replace('_', ' ').title()} detected - waiting...")
+                    self.stop_continuous_scrolling()  # Stop any previous scrolling
+                    
+                    self.status_updated.emit(f"🖐️ Detected {gesture_name} ({confidence:.2f}) - Starting...")
+                    self.gesture_status.setText(f"⏳ {gesture_name.replace('_', ' ').title()} - starting...")
                     self.gesture_status.setStyleSheet("""
                         color: #FFC107; 
                         padding: 5px; 
@@ -283,34 +296,29 @@ class DataPanel(QFrame):
                     """)
                     return
                 
-                # Check if we've held the gesture long enough
+                # Check if we've held the gesture long enough to start continuous scrolling
                 hold_duration = current_time - self.gesture_start_time
                 if hold_duration >= self.gesture_hold_time:
-                    # Execute the action
-                    action_function = self.gesture_actions[gesture_name]
-                    action_function()
-                    
-                    self.status_updated.emit(f"✅ Executed {gesture_name} action ({confidence:.2f})")
-                    self.gesture_status.setText(f"✅ {gesture_name.replace('_', ' ').title()} executed!")
-                    self.gesture_status.setStyleSheet("""
-                        color: #4CAF50; 
-                        padding: 5px; 
-                        background-color: #2d2d2d; 
-                        border-radius: 3px; 
-                        font-size: 12px;
-                        font-weight: bold;
-                    """)
-                    
-                    # Reset timing to prevent continuous execution
-                    self.gesture_start_time = None
-                    self.last_executed_gesture = None
-                    
-                    # Add a brief delay to prevent accidental re-triggering
-                    QTimer.singleShot(2000, self.reset_gesture_status)
+                    # Start continuous scrolling
+                    if not self.continuous_scrolling:
+                        self.current_scroll_action = self.gesture_actions[gesture_name]
+                        self.start_continuous_scrolling()
+                        
+                        self.status_updated.emit(f"▶️ Scrolling with {gesture_name} ({confidence:.2f})")
+                        confidence_bar = "█" * int(confidence * 10)  # Visual confidence indicator
+                        self.gesture_status.setText(f"▶️ {gesture_name.replace('_', ' ').title()} active {confidence_bar}")
+                        self.gesture_status.setStyleSheet("""
+                            color: #4CAF50; 
+                            padding: 5px; 
+                            background-color: #2d2d2d; 
+                            border-radius: 3px; 
+                            font-size: 12px;
+                            font-weight: bold;
+                        """)
                 else:
-                    # Show countdown progress
+                    # Show shorter countdown for faster response
                     remaining = self.gesture_hold_time - hold_duration
-                    self.gesture_status.setText(f"⏳ {gesture_name.replace('_', ' ').title()} - {remaining:.1f}s remaining")
+                    self.gesture_status.setText(f"⏳ {gesture_name.replace('_', ' ').title()} - {remaining:.1f}s")
                     self.gesture_status.setStyleSheet("""
                         color: #FF9800; 
                         padding: 5px; 
@@ -321,11 +329,23 @@ class DataPanel(QFrame):
                     """)
                     
             else:
-                # Reset if confidence drops or gesture changes
-                if confidence < self.gesture_confidence_threshold:
-                    self.gesture_start_time = None
-                    self.last_executed_gesture = None
-                    if hasattr(self, 'gesture_status'):
+                # Stop scrolling if confidence drops or gesture changes
+                self.stop_continuous_scrolling()
+                self.gesture_start_time = None
+                self.last_executed_gesture = None
+                
+                if confidence < self.gesture_confidence_threshold and hasattr(self, 'gesture_status'):
+                    if confidence > 0.5:  # Show low confidence warning
+                        self.gesture_status.setText(f"⚠️ Low confidence: {confidence:.2f}")
+                        self.gesture_status.setStyleSheet("""
+                            color: #FF5722; 
+                            padding: 5px; 
+                            background-color: #2d2d2d; 
+                            border-radius: 3px; 
+                            font-size: 12px;
+                            font-weight: bold;
+                        """)
+                    else:
                         self.gesture_status.setText("🤚 Ready for gestures")
                         self.gesture_status.setStyleSheet("""
                             color: #4CAF50; 
@@ -337,8 +357,26 @@ class DataPanel(QFrame):
                         """)
         
         except Exception as e:
-            # Silently handle any data processing errors to prevent crashes
+            self.stop_continuous_scrolling()
             self.status_updated.emit(f"❌ Gesture processing error: {str(e)}")
+    
+    def start_continuous_scrolling(self):
+        """Start continuous scrolling with current action."""
+        if not self.continuous_scrolling and self.current_scroll_action:
+            self.continuous_scrolling = True
+            self.scroll_timer.start(50)  # 20 FPS for smooth scrolling
+    
+    def stop_continuous_scrolling(self):
+        """Stop continuous scrolling."""
+        if self.continuous_scrolling:
+            self.continuous_scrolling = False
+            self.scroll_timer.stop()
+            self.current_scroll_action = None
+    
+    def execute_continuous_scroll(self):
+        """Execute the current scroll action continuously."""
+        if self.current_scroll_action and self.continuous_scrolling:
+            self.current_scroll_action()
     
     def scroll_down(self):
         """Scroll down in the data table (pointing gesture)."""
@@ -349,11 +387,10 @@ class DataPanel(QFrame):
         current_value = vertical_scrollbar.value()
         max_value = vertical_scrollbar.maximum()
         
-        # Smooth scroll down
-        new_value = min(current_value + self.scroll_smoothness * 10, max_value)
+        # Dynamic scroll amount based on confidence and speed multiplier
+        scroll_amount = int(self.scroll_smoothness * self.scroll_speed_multiplier)
+        new_value = min(current_value + scroll_amount, max_value)
         vertical_scrollbar.setValue(new_value)
-        
-        self.status_updated.emit(f"📄 Scrolled down (row {self.data_table.currentRow()})")
     
     def scroll_up(self):
         """Scroll up in the data table (pinch gesture)."""
@@ -363,11 +400,10 @@ class DataPanel(QFrame):
         vertical_scrollbar = self.data_table.verticalScrollBar()
         current_value = vertical_scrollbar.value()
         
-        # Smooth scroll up
-        new_value = max(current_value - self.scroll_smoothness * 10, 0)
+        # Dynamic scroll amount based on confidence and speed multiplier
+        scroll_amount = int(self.scroll_smoothness * self.scroll_speed_multiplier)
+        new_value = max(current_value - scroll_amount, 0)
         vertical_scrollbar.setValue(new_value)
-        
-        self.status_updated.emit(f"📄 Scrolled up (row {self.data_table.currentRow()})")
     
     def scroll_right(self):
         """Scroll right in the data table (open_hand gesture)."""
@@ -378,11 +414,10 @@ class DataPanel(QFrame):
         current_value = horizontal_scrollbar.value()
         max_value = horizontal_scrollbar.maximum()
         
-        # Smooth scroll right
-        new_value = min(current_value + self.scroll_smoothness * 15, max_value)
+        # Dynamic scroll amount for horizontal (slightly faster)
+        scroll_amount = int(self.scroll_smoothness * 1.5 * self.scroll_speed_multiplier)
+        new_value = min(current_value + scroll_amount, max_value)
         horizontal_scrollbar.setValue(new_value)
-        
-        self.status_updated.emit(f"📄 Scrolled right (col {self.data_table.currentColumn()})")
     
     def scroll_left(self):
         """Scroll left in the data table (fist gesture)."""
@@ -392,11 +427,10 @@ class DataPanel(QFrame):
         horizontal_scrollbar = self.data_table.horizontalScrollBar()
         current_value = horizontal_scrollbar.value()
         
-        # Smooth scroll left
-        new_value = max(current_value - self.scroll_smoothness * 15, 0)
+        # Dynamic scroll amount for horizontal (slightly faster)
+        scroll_amount = int(self.scroll_smoothness * 1.5 * self.scroll_speed_multiplier)
+        new_value = max(current_value - scroll_amount, 0)
         horizontal_scrollbar.setValue(new_value)
-        
-        self.status_updated.emit(f"📄 Scrolled left (col {self.data_table.currentColumn()})")
     
     def process_data_gesture(self, gesture_name, gesture_data):
         """Process gesture for data manipulation (legacy method - now handled by process_gesture_queue)."""
@@ -410,6 +444,13 @@ class DataPanel(QFrame):
     
     def reset_gesture_status(self):
         """Reset gesture status indicator to ready state."""
+        # Stop any continuous scrolling
+        self.stop_continuous_scrolling()
+        
+        # Reset gesture tracking
+        self.gesture_start_time = None
+        self.last_executed_gesture = None
+        
         if hasattr(self, 'gesture_status'):
             self.gesture_status.setText("🤚 Ready for gestures")
             self.gesture_status.setStyleSheet("""
@@ -423,8 +464,15 @@ class DataPanel(QFrame):
     
     def cleanup(self):
         """Clean up resources when panel is destroyed."""
+        # Stop continuous scrolling
+        self.stop_continuous_scrolling()
+        
+        # Stop all timers
         if hasattr(self, 'update_timer') and self.update_timer:
             self.update_timer.stop()
         
         if hasattr(self, 'gesture_timer') and self.gesture_timer:
-            self.gesture_timer.stop() 
+            self.gesture_timer.stop()
+        
+        if hasattr(self, 'scroll_timer') and self.scroll_timer:
+            self.scroll_timer.stop() 
