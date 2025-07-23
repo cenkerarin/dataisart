@@ -56,22 +56,28 @@ class GestureClassifier:
     def _try_load_existing_model(self):
         """Try to load an existing enhanced model."""
         try:
-            # Look for existing enhanced models
-            data_dir = "data/gesture_data"
-            if os.path.exists(data_dir):
-                model_files = [f for f in os.listdir(data_dir) 
-                             if f.startswith('enhanced_model_') and f.endswith('.pkl')]
-                
-                if model_files:
-                    # Load the latest model
-                    model_files.sort(reverse=True)
-                    latest_model = os.path.join(data_dir, model_files[0])
+            # Look for existing enhanced models - check multiple possible locations
+            possible_data_dirs = [
+                "data/gesture_data",  # When running from hand_tracking directory
+                "src/core/hand_tracking/data/gesture_data",  # When running from project root
+                os.path.join(os.path.dirname(__file__), "..", "data", "gesture_data")  # Relative to this file
+            ]
+            
+            for data_dir in possible_data_dirs:
+                if os.path.exists(data_dir):
+                    model_files = [f for f in os.listdir(data_dir) 
+                                 if f.startswith('enhanced_model_') and f.endswith('.pkl')]
                     
-                    self.enhanced_classifier.load_enhanced_model(latest_model)
-                    self.is_trained = True
-                    print(f"✅ Loaded existing enhanced model: {latest_model}")
-                    return True
-                    
+                    if model_files:
+                        # Load the latest model
+                        model_files.sort(reverse=True)
+                        latest_model = os.path.join(data_dir, model_files[0])
+                        
+                        self.enhanced_classifier.load_enhanced_model(latest_model)
+                        self.is_trained = True
+                        print(f"✅ Loaded existing enhanced model: {latest_model}")
+                        return True
+                        
         except Exception as e:
             print(f"⚠️  Could not load existing model: {e}")
         
@@ -91,12 +97,41 @@ class GestureClassifier:
         print("🔄 Training enhanced gesture classifier...")
         
         try:
-            # Try to train with enhanced features using real data if available
-            success = self.enhanced_classifier.train_enhanced_model(
-                use_advanced_preprocessing=True,
-                use_feature_selection=True,
-                use_pca=True
-            )
+            # Find the latest dataset file - check multiple possible locations
+            possible_data_dirs = [
+                "data/gesture_data",  # When running from hand_tracking directory
+                "src/core/hand_tracking/data/gesture_data",  # When running from project root
+                os.path.join(os.path.dirname(__file__), "..", "data", "gesture_data")  # Relative to this file
+            ]
+            
+            dataset_file = None
+            data_dir = None
+            
+            for dir_path in possible_data_dirs:
+                if os.path.exists(dir_path):
+                    data_dir = dir_path
+                    break
+            
+            if data_dir:
+                dataset_files = [f for f in os.listdir(data_dir) 
+                               if f.startswith('enhanced_gesture_dataset_') and f.endswith('.json')]
+                
+                if dataset_files:
+                    dataset_files.sort(reverse=True)
+                    dataset_file = os.path.join(data_dir, dataset_files[0])
+                    print(f"📊 Found training dataset: {dataset_file}")
+            
+            if dataset_file and os.path.exists(dataset_file):
+                # Try to train with enhanced features using real data
+                success = self.enhanced_classifier.train_enhanced_model(
+                    data_file=dataset_file,
+                    use_advanced_preprocessing=True,
+                    use_feature_selection=True,
+                    use_pca=True
+                )
+            else:
+                print(f"❌ No training dataset found in {data_dir}")
+                success = False
             
             if success:
                 self.is_trained = True
@@ -205,6 +240,54 @@ class GestureClassifier:
                 cleaned.append(cleaned_landmark)
         
         return cleaned
+    
+    def predict(self, landmarks):
+        """
+        Predict gesture from landmarks - maintains compatibility with old interface.
+        
+        Args:
+            landmarks: List of landmark dictionaries with x, y, z, visibility
+            
+        Returns:
+            str: Predicted gesture name
+        """
+        if not self.is_trained:
+            return "unknown"
+            
+        try:
+            prediction = self.enhanced_classifier.predict_gesture(landmarks)
+            return prediction
+        except Exception as e:
+            print(f"⚠️  Prediction error: {e}")
+            return "unknown"
+    
+    def get_confidence(self):
+        """
+        Get confidence of last prediction - maintains compatibility.
+        
+        Returns:
+            float: Confidence score (0-1)
+        """
+        try:
+            return self.enhanced_classifier.get_last_confidence()
+        except Exception as e:
+            print(f"⚠️  Confidence error: {e}")
+            return 0.0
+    
+    def get_gesture_name(self, gesture_id):
+        """
+        Get gesture name from ID - maintains compatibility.
+        
+        Args:
+            gesture_id: Gesture ID
+            
+        Returns:
+            str: Gesture name
+        """
+        try:
+            return self.enhanced_classifier.gesture_labels.get(gesture_id, "unknown")
+        except:
+            return "unknown"
     
     def predict_gesture(self, landmarks: List[Dict[str, float]]) -> Dict[str, Any]:
         """
