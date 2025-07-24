@@ -231,9 +231,9 @@ class CameraPanel(QFrame):
         # Gesture information
         self.setup_gesture_info(layout)
         
-        # Detection settings
-        self.setup_detection_settings(layout)
-    
+        # REMOVE: Detection settings UI (no longer needed)
+        # self.setup_detection_settings(layout)
+
     def setup_camera_controls(self, layout):
         """Setup camera control buttons."""
         controls_group = QGroupBox("Camera Controls")
@@ -365,8 +365,12 @@ class CameraPanel(QFrame):
         layout.addWidget(settings_group)
     
     def start_camera(self):
-        """Start camera and gesture detection."""
+        """Start camera and gesture detection with detection/classification enabled by default."""
         try:
+            # Enable detection and classification by default
+            self.camera_worker.enable_gesture_detection = True
+            self.camera_worker.enable_classification = True
+            
             if self.camera_worker.initialize_camera():
                 self.camera_worker.start()
                 self.camera_active = True
@@ -485,12 +489,8 @@ class CameraPanel(QFrame):
         self.fps_label.setText(f"FPS: {fps}")
     
     def update_settings(self):
-        """Update detection settings."""
-        if hasattr(self.camera_worker, 'show_landmarks'):
-            self.camera_worker.show_landmarks = self.landmarks_checkbox.isChecked()
-            self.camera_worker.show_connections = self.connections_checkbox.isChecked()
-            self.camera_worker.enable_gesture_detection = self.detection_checkbox.isChecked()
-            self.camera_worker.enable_classification = self.classification_checkbox.isChecked()
+        """No-op: Detection settings UI removed."""
+        pass
     
     @pyqtSlot(str)
     def handle_error(self, error_message):
