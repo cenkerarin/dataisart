@@ -58,6 +58,14 @@ class StatusBar(QStatusBar):
         # Separator
         self.addPermanentWidget(self.create_separator())
         
+        # Voice status
+        self.voice_status = QLabel("🎤 Voice inactive")
+        self.voice_status.setMinimumWidth(130)
+        self.addPermanentWidget(self.voice_status)
+        
+        # Separator
+        self.addPermanentWidget(self.create_separator())
+        
         # Dataset status
         self.dataset_status = QLabel("📊 No dataset")
         self.dataset_status.setMinimumWidth(120)
@@ -101,6 +109,10 @@ class StatusBar(QStatusBar):
     def update_camera_status(self, status):
         """Update camera status."""
         self.camera_status.setText(status)
+    
+    def update_voice_status(self, status):
+        """Update voice recognition status."""
+        self.voice_status.setText(status)
     
     def update_dataset_status(self, status):
         """Update dataset status."""

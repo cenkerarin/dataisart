@@ -260,6 +260,68 @@ class DataPanel(QFrame):
         except Exception as e:
             self.status_updated.emit(f"❌ Gesture handling error: {str(e)}")
     
+    def handle_voice_command(self, command_data):
+        """Handle parsed voice commands from voice panel."""
+        try:
+            intent = command_data.get('intent', 'unknown')
+            confidence = command_data.get('confidence', 0.0)
+            
+            self.status_updated.emit(f"🎤 Voice command: {intent} (confidence: {confidence:.2f})")
+            
+            # Handle different command intents
+            if intent == 'show' or intent == 'describe':
+                self.handle_show_command(command_data)
+            elif intent == 'filter':
+                self.handle_filter_command(command_data)
+            elif intent == 'sort':
+                self.handle_sort_command(command_data)
+            elif intent == 'visualize':
+                self.handle_visualize_command(command_data)
+            elif intent == 'aggregate':
+                self.handle_aggregate_command(command_data)
+            elif intent == 'group':
+                self.handle_group_command(command_data)
+            else:
+                self.status_updated.emit(f"⚠️ Voice command '{intent}' not yet implemented")
+                
+        except Exception as e:
+            self.status_updated.emit(f"❌ Voice command error: {str(e)}")
+    
+    def handle_show_command(self, command_data):
+        """Handle show/describe commands."""
+        if self.current_dataset is None:
+            self.status_updated.emit("❌ No dataset loaded")
+            return
+        
+        # For now, just show basic dataset info
+        rows, cols = self.current_dataset.shape
+        self.status_updated.emit(f"📊 Dataset: {rows} rows, {cols} columns")
+    
+    def handle_filter_command(self, command_data):
+        """Handle filter commands."""
+        self.status_updated.emit("🔍 Filter command received - implementation coming soon")
+        # TODO: Implement data filtering based on voice commands
+    
+    def handle_sort_command(self, command_data):
+        """Handle sort commands."""
+        self.status_updated.emit("📈 Sort command received - implementation coming soon")
+        # TODO: Implement data sorting based on voice commands
+    
+    def handle_visualize_command(self, command_data):
+        """Handle visualization commands."""
+        self.status_updated.emit("📊 Visualization command received - implementation coming soon")
+        # TODO: Implement data visualization based on voice commands
+    
+    def handle_aggregate_command(self, command_data):
+        """Handle aggregation commands."""
+        self.status_updated.emit("🔢 Aggregation command received - implementation coming soon")
+        # TODO: Implement data aggregation based on voice commands
+    
+    def handle_group_command(self, command_data):
+        """Handle group commands."""
+        self.status_updated.emit("👥 Group command received - implementation coming soon")
+        # TODO: Implement data grouping based on voice commands
+    
     def process_gesture_queue(self):
         """Process gesture data with enhanced smoothness and continuous scrolling."""
         try:

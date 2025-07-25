@@ -15,6 +15,7 @@ from PyQt5.QtGui import QFont, QPalette, QColor
 
 from .widgets.data_panel import DataPanel
 from .widgets.camera_panel import CameraPanel
+from .widgets.voice_panel import VoicePanel
 from .widgets.status_bar import StatusBar
 
 
@@ -32,6 +33,7 @@ class MainWindow(QMainWindow):
         # Initialize core components
         self.data_panel = None
         self.camera_panel = None
+        self.voice_panel = None
         self.status_bar_widget = None
         
         # Setup UI
@@ -90,12 +92,17 @@ class MainWindow(QMainWindow):
         self.data_panel = DataPanel()
         splitter.addWidget(self.data_panel)
         
-        # Create and add camera panel (right side)
+        # Create and add camera panel (center)
         self.camera_panel = CameraPanel()
         splitter.addWidget(self.camera_panel)
         
-        # Set initial splitter sizes (60% data, 40% camera)
-        splitter.setSizes([840, 560])
+        # Create and add voice panel (right side)
+        self.voice_panel = VoicePanel()
+        self.voice_panel.setMaximumWidth(350)  # Fixed width for voice panel
+        splitter.addWidget(self.voice_panel)
+        
+        # Set initial splitter sizes (50% data, 30% camera, 20% voice)
+        splitter.setSizes([700, 420, 280])
         
         # Setup status bar
         self.status_bar_widget = StatusBar()
@@ -111,6 +118,20 @@ class MainWindow(QMainWindow):
             self.camera_panel.gesture_detected.connect(self.data_panel.handle_gesture)
             print("✅ Connected gesture detection to data panel")
         
+        # Connect gesture detection to voice panel for gesture-triggered voice recognition
+        if hasattr(self.camera_panel, 'gesture_detected') and hasattr(self.voice_panel, 'update_gesture_status'):
+            self.camera_panel.gesture_detected.connect(self.handle_gesture_for_voice)
+            print("✅ Connected gesture detection to voice panel")
+        
+        # Connect voice commands to data panel for voice-controlled data operations
+        if hasattr(self.voice_panel, 'command_parsed') and hasattr(self.data_panel, 'handle_voice_command'):
+            self.voice_panel.command_parsed.connect(self.data_panel.handle_voice_command)
+            print("✅ Connected voice commands to data panel")
+        
+        # Connect voice status to status bar
+        if hasattr(self.voice_panel, 'voice_status_changed'):
+            self.voice_panel.voice_status_changed.connect(self.status_bar_widget.update_voice_status)
+        
         # Connect data panel status updates to status bar
         if hasattr(self.data_panel, 'status_updated'):
             self.data_panel.status_updated.connect(self.status_bar_widget.update_status)
@@ -118,6 +139,13 @@ class MainWindow(QMainWindow):
         # Connect camera panel status updates to status bar
         if hasattr(self.camera_panel, 'camera_status_changed'):
             self.camera_panel.camera_status_changed.connect(self.status_bar_widget.update_camera_status)
+    
+    def handle_gesture_for_voice(self, gesture_data):
+        """Handle gesture data for voice panel."""
+        if self.voice_panel and gesture_data:
+            gesture_name = gesture_data.get("gesture", "")
+            confidence = gesture_data.get("confidence", 0.0)
+            self.voice_panel.update_gesture_status(gesture_name, confidence)
     
     def update_interface(self):
         """Update interface elements periodically."""
@@ -134,6 +162,10 @@ class MainWindow(QMainWindow):
         # Cleanup data panel resources  
         if self.data_panel:
             self.data_panel.cleanup()
+        
+        # Cleanup voice panel resources
+        if self.voice_panel:
+            self.voice_panel.cleanup()
         
         # Stop update timer
         if self.update_timer:
