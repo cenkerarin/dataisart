@@ -44,9 +44,9 @@ class AudioConfig:
     channels: int = 1
     dtype: str = 'float32'  # Use float32 for proper normalization
     chunk_duration: float = 0.1  # seconds
-    silence_threshold: float = 0.02  # Adjusted for normalized audio
-    silence_duration: float = 1.0  # seconds of silence before stopping
-    max_recording_duration: float = 30.0  # maximum recording length
+    silence_threshold: float = 0.005  # Lower threshold for better sensitivity
+    silence_duration: float = 2.0  # seconds of silence before stopping (increased)
+    max_recording_duration: float = 10.0  # maximum recording length (reduced)
     min_recording_duration: float = 0.5   # minimum recording length
 
 @dataclass
@@ -109,6 +109,7 @@ class VoiceRecorder:
     def __init__(self, config: AudioConfig):
         self.config = config
         self.is_recording = False
+        self.should_stop = False  # Flag to signal when to stop
         self.audio_buffer = []
         self.silence_counter = 0
         self.recording_start_time = 0
@@ -127,9 +128,16 @@ class VoiceRecorder:
             logger.info(f"Using input device: {devices[default_input]['name']}")
             
             self.is_recording = True
+            self.should_stop = False
             self.audio_buffer = []
             self.silence_counter = 0
             self.recording_start_time = time.time()
+            
+            # Reset logging flags
+            if hasattr(self, '_max_duration_logged'):
+                delattr(self, '_max_duration_logged')
+            if hasattr(self, '_silence_logged'):
+                delattr(self, '_silence_logged')
             
             return True
             
@@ -139,12 +147,14 @@ class VoiceRecorder:
     
     def stop_recording(self) -> Optional[AudioSegment]:
         """Stop recording and return audio segment."""
-        if not self.is_recording:
-            return None
-        
+        # Always stop recording, but still process the buffer
+        was_recording = self.is_recording
         self.is_recording = False
         
+        logger.info(f"stop_recording called: was_recording={was_recording}, buffer_size={len(self.audio_buffer)}")
+        
         if not self.audio_buffer:
+            logger.warning("No audio data in buffer")
             return None
         
         # Combine audio chunks
@@ -152,10 +162,13 @@ class VoiceRecorder:
         
         # Check minimum duration
         duration = len(audio_data) / self.config.sample_rate
+        logger.info(f"Audio segment duration: {duration:.2f}s (min required: {self.config.min_recording_duration:.2f}s)")
+        
         if duration < self.config.min_recording_duration:
-            logger.debug(f"Recording too short: {duration:.2f}s")
+            logger.warning(f"Recording too short: {duration:.2f}s")
             return None
         
+        logger.info(f"Creating audio segment: {duration:.2f}s duration")
         return AudioSegment(audio_data, self.config.sample_rate, self.recording_start_time)
     
     def process_audio_chunk(self, chunk: np.ndarray) -> bool:
@@ -187,12 +200,24 @@ class VoiceRecorder:
         if chunk_count % int(1.0 / self.config.chunk_duration) == 0:  # Every ~1 second
             logger.debug(f"Recording: {current_duration:.1f}s, RMS: {rms:.4f}, Silence: {silence_duration:.1f}s")
         
-        # Stop if max duration reached or silence detected
+        # Check if we should stop (but don't stop immediately)
+        should_stop = False
+        
+        # Stop if max duration reached
         if current_duration > self.config.max_recording_duration:
-            logger.info(f"Stopping recording: max duration reached ({current_duration:.1f}s)")
-            return False
+            if not hasattr(self, '_max_duration_logged'):
+                logger.info(f"Should stop: max duration reached ({current_duration:.1f}s)")
+                self._max_duration_logged = True
+            should_stop = True
+        # Stop if silence detected (but only log once)
         elif silence_duration > self.config.silence_duration:
-            logger.info(f"Stopping recording: silence detected ({silence_duration:.1f}s)")
+            if not hasattr(self, '_silence_logged'):
+                logger.info(f"Should stop: silence detected ({silence_duration:.1f}s, RMS: {rms:.4f})")
+                self._silence_logged = True
+            should_stop = True
+        
+        if should_stop:
+            self.should_stop = True
             return False
         
         return True
@@ -279,12 +304,20 @@ if PYQT_AVAILABLE:
                 ):
                     # Wait for recording to complete
                     start_time = time.time()
-                    while self.recorder.is_recording and self.is_active:
+                    while self.recorder.is_recording and self.is_active and not self.recorder.should_stop:
                         time.sleep(0.1)
                         # Debug: Show recording progress
                         elapsed = time.time() - start_time
                         if elapsed > 0 and int(elapsed) % 5 == 0 and elapsed - int(elapsed) < 0.1:
                             logger.info(f"Recording... {elapsed:.1f}s elapsed")
+                    
+                    # Log why recording stopped
+                    if self.recorder.should_stop:
+                        logger.info("Recording stopped due to stop condition (silence or max duration)")
+                    elif not self.is_active:
+                        logger.info("Recording stopped due to thread shutdown")
+                    else:
+                        logger.info("Recording stopped for unknown reason")
                 
             except Exception as e:
                 logger.error(f"Recording error: {e}")
@@ -318,15 +351,20 @@ if PYQT_AVAILABLE:
             else:
                 self._callback_count = 1
             
-            if self._callback_count % 50 == 0:  # Every ~0.5 seconds at 0.1s chunks
-                rms = np.sqrt(np.mean(audio_chunk**2))
-                logger.debug(f"Audio level: {rms:.4f}")
+            # Calculate RMS for real-time feedback
+            rms = np.sqrt(np.mean(audio_chunk**2))
+            
+            # Log audio levels more frequently for debugging
+            if self._callback_count % 10 == 0:  # Every ~1 second at 0.1s chunks
+                logger.info(f"Audio level: {rms:.4f} (threshold: {self.audio_config.silence_threshold:.4f})")
             
             # Process chunk and check if should continue
-            if not self.recorder.process_audio_chunk(audio_chunk):
-                # Signal to stop recording
-                logger.debug("Stopping recording due to silence or max duration")
-                pass
+            should_continue = self.recorder.process_audio_chunk(audio_chunk)
+            if not should_continue:
+                # Mark that we should stop, but don't actually stop here
+                # Let the main recording loop handle it
+                logger.info("Audio callback: stop condition met")
+                # Don't set is_recording = False here, let the main loop handle it
         
         def _transcribe_segment(self, segment: AudioSegment):
             """Transcribe audio segment using Whisper."""
