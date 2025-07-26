@@ -57,6 +57,7 @@ class VoiceDebugPanel(QWidget):
         self.gesture_start_time = None
         self.last_activation_time = 0
         self.current_gesture = None
+        self.manually_stopped = False  # Track manual stops due to gesture removal
         
         # Debug counters
         self.total_activations = 0
@@ -634,7 +635,8 @@ class VoiceDebugPanel(QWidget):
     # Copy all the other methods from the original VoicePanel but with debug logging
     def update_gesture_status(self, gesture: str, confidence: float = 0.0):
         """Update current gesture status from camera panel."""
-        self.current_gesture = gesture if confidence > 0.7 else None
+        # Set current_gesture to None if confidence is too low or gesture is "none"
+        self.current_gesture = gesture if (confidence > 0.7 and gesture != "none") else None
         
         if self.current_gesture:
             self.gesture_status_label.setText(f"✋ Gesture: {gesture.replace('_', ' ').title()} ({confidence:.2f})")
@@ -682,6 +684,19 @@ class VoiceDebugPanel(QWidget):
                 self.gesture_start_time = None
                 self.activation_progress.setVisible(False)
                 self.add_debug_log("❌ Gesture lost - activation cancelled")
+            
+            # Stop voice recognition if currently listening and gesture is lost
+            if self.is_listening and self.voice_handler:
+                self.manually_stopped = True  # Flag that we manually stopped
+                # Temporarily disconnect recording status signal to prevent race condition
+                self.voice_handler.recording_status_changed.disconnect()
+                self.voice_handler.stop_listening()
+                # Reconnect the signal
+                self.voice_handler.recording_status_changed.connect(self.on_recording_status_changed)
+                self.is_listening = False
+                self.voice_status_label.setText("✅ Voice Recognition: Ready")
+                self.voice_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+                self.add_debug_log("🛑 Voice recognition stopped - gesture removed")
     
     def activate_voice_recognition(self):
         """Activate voice recognition through gesture trigger."""
@@ -696,6 +711,7 @@ class VoiceDebugPanel(QWidget):
         
         if self.voice_handler and self.voice_handler.start_listening():
             self.is_listening = True
+            self.manually_stopped = False  # Reset manual stop flag
             self.recording_start_time = time.time()
             self.voice_status_label.setText("🎤 Listening...")
             self.voice_status_label.setStyleSheet("color: #ff6b6b; font-weight: bold;")
@@ -710,7 +726,12 @@ class VoiceDebugPanel(QWidget):
             return
         
         if self.is_listening:
+            self.manually_stopped = True  # Flag manual stop
+            # Temporarily disconnect recording status signal to prevent race condition
+            self.voice_handler.recording_status_changed.disconnect()
             self.voice_handler.stop_listening()
+            # Reconnect the signal
+            self.voice_handler.recording_status_changed.connect(self.on_recording_status_changed)
             self.is_listening = False
             self.manual_button.setText("🎤 Start Voice Recognition")
             self.voice_status_label.setText("✅ Voice Recognition: Ready")
@@ -722,6 +743,7 @@ class VoiceDebugPanel(QWidget):
             
             if self.voice_handler.start_listening():
                 self.is_listening = True
+                self.manually_stopped = False  # Reset manual stop flag
                 self.recording_start_time = time.time()
                 self.manual_button.setText("🛑 Stop Listening")
                 self.voice_status_label.setText("🎤 Listening...")
@@ -803,6 +825,7 @@ class VoiceDebugPanel(QWidget):
         
         # Reset listening state
         self.is_listening = False
+        self.manually_stopped = False  # Reset manual stop flag on successful transcription
         self.manual_button.setText("🎤 Start Voice Recognition")
         self.voice_status_label.setText("✅ Voice Recognition: Ready")
         self.voice_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
@@ -815,6 +838,7 @@ class VoiceDebugPanel(QWidget):
         
         # Reset listening state
         self.is_listening = False
+        self.manually_stopped = False  # Reset manual stop flag on error
         self.manual_button.setText("🎤 Start Voice Recognition")
         self.voice_status_label.setText("✅ Voice Recognition: Ready")
         self.voice_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
@@ -823,13 +847,18 @@ class VoiceDebugPanel(QWidget):
     def on_recording_status_changed(self, is_recording: bool):
         """Handle recording status changes."""
         if is_recording:
+            self.manually_stopped = False  # Reset manual stop flag when recording starts
             self.voice_status_label.setText("🔴 Recording...")
             self.voice_status_label.setStyleSheet("color: #e74c3c; font-weight: bold;")
             self.add_debug_log("🔴 Audio recording started")
         else:
-            self.voice_status_label.setText("⏳ Processing...")
-            self.voice_status_label.setStyleSheet("color: #f39c12; font-weight: bold;")
-            self.add_debug_log("⏳ Audio recording stopped - processing with Whisper...")
+            # Only show "Processing" if we didn't manually stop
+            if not self.manually_stopped:
+                self.voice_status_label.setText("⏳ Processing...")
+                self.voice_status_label.setStyleSheet("color: #f39c12; font-weight: bold;")
+                self.add_debug_log("⏳ Audio recording stopped - processing with Whisper...")
+            else:
+                self.add_debug_log("🛑 Recording stopped due to manual cancellation")
     
     def add_debug_log(self, message: str):
         """Add message to debug logs."""

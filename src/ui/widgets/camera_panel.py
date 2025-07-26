@@ -445,10 +445,24 @@ class CameraPanel(QFrame):
         """Update gesture display with detection results."""
         if not results.get("hands_detected"):
             self.current_gesture.setText("No hands detected")
+            # Emit signal to indicate no gesture detected
+            self.gesture_detected.emit({
+                "gesture": "none",
+                "confidence": 0.0,
+                "handedness": "none",
+                "hand_confidence": 0.0
+            })
             return
         
         hands = results.get("hands", [])
         if not hands:
+            # Emit signal to indicate no gesture detected
+            self.gesture_detected.emit({
+                "gesture": "none",
+                "confidence": 0.0,
+                "handedness": "none",
+                "hand_confidence": 0.0
+            })
             return
         
         # Display information for the first detected hand
@@ -464,7 +478,7 @@ class CameraPanel(QFrame):
             
             display_text = f"🖐️ {handedness} hand: {gesture_name}\nConfidence: {gesture_confidence:.2f}"
             
-            # Emit gesture signal for data panel
+            # Emit gesture signal
             self.gesture_detected.emit({
                 "gesture": gesture_name,
                 "confidence": gesture_confidence,
@@ -473,6 +487,13 @@ class CameraPanel(QFrame):
             })
         else:
             display_text = f"🖐️ {handedness} hand detected\nConfidence: {confidence:.2f}"
+            # Emit signal to indicate hand detected but no gesture classified
+            self.gesture_detected.emit({
+                "gesture": "none",
+                "confidence": 0.0,
+                "handedness": handedness,
+                "hand_confidence": confidence
+            })
         
         self.current_gesture.setText(display_text)
     
