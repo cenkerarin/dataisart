@@ -378,7 +378,6 @@ class AIAssistant:
             api_key = llm_config.get("api_key")
             
             if not api_key:
-                logger.warning("No API key provided. AI assistant will work in demo mode.")
                 self.is_initialized = True
                 return True
             

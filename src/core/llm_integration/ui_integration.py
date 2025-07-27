@@ -15,11 +15,21 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QGroupBox, QProgressBar, QListWidget, QListWidgetItem)
 from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QPixmap, QPalette, QColor
-from PyQt5.QtWebEngineWidgets import QWebEngineView
+
+# Try to import QtWebEngine, but make it optional
+try:
+    from PyQt5.QtWebEngineWidgets import QWebEngineView
+    WEBENGINE_AVAILABLE = True
+except ImportError:
+    WEBENGINE_AVAILABLE = False
+
 import plotly
 import plotly.graph_objects as go
 
-from .ai_assistant import ActionResult, ActionType
+try:
+    from .ai_assistant import ActionResult, ActionType
+except ImportError:
+    from ai_assistant import ActionResult, ActionType
 
 logger = logging.getLogger(__name__)
 
@@ -71,26 +81,11 @@ class AIResultDisplayWidget(QWidget):
         scroll.setWidget(self.content_widget)
         layout.addWidget(scroll)
         
-        # Initial empty state
-        self.show_empty_state()
+
         
     def show_empty_state(self):
         """Show empty state when no results are available."""
         self.clear_content()
-        
-        empty_label = QLabel("💬 Ready for voice commands!\n\nSay things like:\n• 'Describe data'\n• 'Visualize sales'\n• 'Analyze customer age'")
-        empty_label.setAlignment(Qt.AlignCenter)
-        empty_label.setStyleSheet("""
-            QLabel {
-                color: #888;
-                font-size: 14px;
-                padding: 40px;
-                border: 2px dashed #555;
-                border-radius: 10px;
-                background-color: rgba(136, 136, 136, 0.1);
-            }
-        """)
-        self.content_layout.addWidget(empty_label)
         
     def clear_content(self):
         """Clear all content from the display."""
@@ -221,30 +216,101 @@ class AIResultDisplayWidget(QWidget):
         section = QGroupBox("Visualization")
         layout = QVBoxLayout(section)
         
-        # Create web view for Plotly
-        web_view = QWebEngineView()
-        web_view.setMinimumHeight(400)
-        
-        # Convert Plotly figure to HTML
-        try:
-            if hasattr(visualization, 'to_html'):
-                html_content = visualization.to_html(include_plotlyjs='cdn')
-            else:
-                # Assume it's already JSON
-                fig = go.Figure(json.loads(visualization))
-                html_content = fig.to_html(include_plotlyjs='cdn')
+        if WEBENGINE_AVAILABLE:
+            # Create web view for Plotly
+            web_view = QWebEngineView()
+            web_view.setMinimumHeight(400)
             
-            web_view.setHtml(html_content)
-            layout.addWidget(web_view)
-            
-            # Emit signal that visualization is ready
-            self.visualization_ready.emit(visualization)
-            
-        except Exception as e:
-            logger.error(f"Error displaying visualization: {e}")
-            error_label = QLabel(f"Error displaying visualization: {str(e)}")
-            error_label.setStyleSheet("color: #F44336; padding: 10px;")
-            layout.addWidget(error_label)
+            # Convert Plotly figure to HTML
+            try:
+                if hasattr(visualization, 'to_html'):
+                    html_content = visualization.to_html(include_plotlyjs='cdn')
+                else:
+                    # Assume it's already JSON
+                    fig = go.Figure(json.loads(visualization))
+                    html_content = fig.to_html(include_plotlyjs='cdn')
+                
+                web_view.setHtml(html_content)
+                layout.addWidget(web_view)
+                
+                # Emit signal that visualization is ready
+                self.visualization_ready.emit(visualization)
+                
+            except Exception as e:
+                logger.error(f"Error displaying visualization: {e}")
+                error_label = QLabel(f"Error displaying visualization: {str(e)}")
+                error_label.setStyleSheet("color: #F44336; padding: 10px;")
+                layout.addWidget(error_label)
+        else:
+            # Fallback: Show text-based description and save link
+            try:
+                import tempfile
+                import webbrowser
+                from pathlib import Path
+                
+                # Create temporary HTML file
+                if hasattr(visualization, 'to_html'):
+                    html_content = visualization.to_html(include_plotlyjs='cdn')
+                else:
+                    fig = go.Figure(json.loads(visualization))
+                    html_content = fig.to_html(include_plotlyjs='cdn')
+                
+                # Save to temp file
+                temp_dir = Path(tempfile.gettempdir())
+                html_file = temp_dir / f"dataisart_viz_{id(visualization)}.html"
+                
+                with open(html_file, 'w') as f:
+                    f.write(html_content)
+                
+                # Create UI elements
+                info_label = QLabel("📊 Visualization Created")
+                info_label.setStyleSheet("""
+                    QLabel {
+                        font-size: 14px;
+                        font-weight: bold;
+                        color: #4CAF50;
+                        padding: 10px;
+                    }
+                """)
+                
+                desc_label = QLabel("Interactive visualization has been generated.\nClick below to open in your browser:")
+                desc_label.setWordWrap(True)
+                desc_label.setStyleSheet("padding: 10px; color: #ccc;")
+                
+                open_button = QPushButton("🌐 Open in Browser")
+                open_button.clicked.connect(lambda: webbrowser.open(f"file://{html_file}"))
+                open_button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #2196F3;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        font-size: 12px;
+                    }
+                    QPushButton:hover {
+                        background-color: #1976D2;
+                    }
+                """)
+                
+                path_label = QLabel(f"File: {html_file}")
+                path_label.setStyleSheet("font-size: 10px; color: #888; padding: 5px;")
+                path_label.setWordWrap(True)
+                
+                layout.addWidget(info_label)
+                layout.addWidget(desc_label)
+                layout.addWidget(open_button)
+                layout.addWidget(path_label)
+                
+                # Emit signal that visualization is ready
+                self.visualization_ready.emit(visualization)
+                
+            except Exception as e:
+                logger.error(f"Error creating visualization fallback: {e}")
+                error_label = QLabel(f"📊 Visualization created but display failed.\nError: {str(e)}\n\nInstall PyQtWebEngine for inline display:\npip install PyQtWebEngine")
+                error_label.setStyleSheet("color: #F44336; padding: 10px;")
+                error_label.setWordWrap(True)
+                layout.addWidget(error_label)
         
         return section
     
@@ -407,22 +473,6 @@ def create_ai_integration_widget(ai_assistant, parent=None) -> AIResultDisplayWi
     """Factory function to create AI integration widget."""
     widget = AIResultDisplayWidget(parent)
     
-    # Example data for testing when no real data is available
-    def show_example():
-        from .ai_assistant import ActionResult, ActionType
-        example_result = ActionResult(
-            success=True,
-            action_type=ActionType.DESCRIBE_DATA,
-            message="This is an example result. Load a dataset and try voice commands!",
-            suggestions=[
-                "Load a CSV file first",
-                "Try saying 'describe data'",
-                "Use 'visualize column_name' for charts"
-            ]
-        )
-        widget.display_result(example_result)
-    
-    # Show example initially
-    QTimer.singleShot(1000, show_example)
+
     
     return widget 

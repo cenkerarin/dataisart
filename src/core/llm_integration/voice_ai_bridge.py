@@ -16,8 +16,12 @@ import sys
 voice_path = Path(__file__).parent.parent / "voice_recognition"
 sys.path.insert(0, str(voice_path))
 
-from .ai_assistant import AIAssistant, ActionResult, ActionType
-from .ui_integration import AICommandProcessor
+try:
+    from .ai_assistant import AIAssistant, ActionResult, ActionType
+    from .ui_integration import AICommandProcessor
+except ImportError:
+    from ai_assistant import AIAssistant, ActionResult, ActionType
+    from ui_integration import AICommandProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -217,12 +221,10 @@ class VoiceAIIntegration:
         """Initialize all components."""
         try:
             # Initialize AI assistant
-            if not self.ai_assistant.initialize():
-                logger.warning("AI assistant initialization failed, will use fallback mode")
+            self.ai_assistant.initialize()
             
             # Initialize voice components
-            if not self.bridge.initialize_voice_components():
-                logger.warning("Voice components initialization failed")
+            self.bridge.initialize_voice_components()
             
             # Set up callbacks
             self.bridge.set_result_callback(self._handle_ai_result)
@@ -274,54 +276,4 @@ class VoiceAIIntegration:
         # if hasattr(self, 'status_updated'):
         #     self.status_updated.emit(status)
     
-    def get_supported_commands(self) -> List[str]:
-        """Get list of supported voice commands."""
-        return [
-            "describe data",
-            "show data summary", 
-            "visualize [column name]",
-            "create histogram for [column]",
-            "make scatter plot of [column] and [column]",
-            "analyze [column name]",
-            "show correlation matrix",
-            "filter data where [condition]",
-            "sort by [column name]",
-            "export data to [format]"
-        ]
-    
-    def get_example_commands(self) -> List[str]:
-        """Get example commands for the current dataset."""
-        if self.ai_assistant.dataset_context.dataframe is None:
-            return [
-                "Load a dataset first",
-                "Try: 'describe data' after loading",
-                "Say: 'visualize sales' for charts"
-            ]
-        
-        # Generate examples based on current dataset
-        columns = self.ai_assistant.dataset_context.columns or []
-        examples = ["describe data"]
-        
-        if columns:
-            # Add visualization examples
-            numeric_cols = []
-            categorical_cols = []
-            
-            df = self.ai_assistant.dataset_context.dataframe
-            if df is not None:
-                numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-                categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
-            
-            if numeric_cols:
-                examples.append(f"visualize {numeric_cols[0]}")
-                examples.append(f"analyze {numeric_cols[0]}")
-                
-                if len(numeric_cols) > 1:
-                    examples.append(f"scatter plot {numeric_cols[0]} and {numeric_cols[1]}")
-            
-            if categorical_cols:
-                examples.append(f"visualize {categorical_cols[0]}")
-            
-            examples.append("show correlation matrix")
-        
-        return examples[:5]  # Limit to 5 examples 
+ 

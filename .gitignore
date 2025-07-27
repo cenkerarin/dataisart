@@ -56,6 +56,34 @@ dist/
 *.egg-info/
 .eggs/
 
-# Environment files
+# Environment files and secrets
 .env
 .env.*
+*.env
+secrets.json
+config.json
+*_config.json
+api_keys.txt
+credentials.json
+auth.json
+
+# API keys and sensitive files
+*api_key*
+*secret*
+*password*
+*token*
+*credentials*
+
+# OS specific
+Thumbs.db
+*.lnk
+
+# IDE specific
+.idea/
+*.swp
+*.swo
+*~
+
+# Local configuration files
+local_settings.py
+config_local.py

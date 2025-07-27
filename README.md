@@ -1,42 +1,67 @@
-# Hands-Free Data Science
+# 🧠🖐️ Hands-Free Data Science
 
-Interact with datasets using your **hands and voice** — no code, no clicks.  
-This project lets you explore and visualize datasets (like Kaggle CSVs) through **hand gestures and natural language commands**, powered by **Computer Vision** and **Large Language Models (LLMs)**.
+An innovative application that combines **hand gesture recognition** and **voice commands** with **AI-powered data analysis** for hands-free data science workflows.
 
----
+## ✨ Features
 
-## 🎯 Project Vision
+- **Voice-Activated AI Assistant**: Natural language commands for data analysis
+- **Hand Gesture Recognition**: Control workflows with hand gestures
+- **Interactive Visualizations**: AI-generated charts and graphs
+- **Smart Command Processing**: OpenAI-powered with pattern matching fallback
+- **Real-time UI**: Live display of analysis results and suggestions
 
-Modern data science tools are powerful, but often require heavy coding and technical expertise.  
-**Hands-Free Data Science** aims to revolutionize the way we interact with data by enabling:
+## 🚀 Quick Start
 
-- ✅ Gesture-based data selection  
-- ✅ Voice-controlled data analysis  
-- ✅ AI-assisted visualizations  
-- ✅ Zero coding, intuitive UX
+1. **Setup Environment**
+   ```bash
+   pip install -r requirements.txt
+   cp env.template .env
+   # Edit .env with your actual API key
+   ```
 
----
+2. **Run Application**
+   ```bash
+   python main.py
+   ```
 
-## 🧱 Core Features
+3. **Use Voice Commands**
+   - Load a dataset
+   - Say: "describe data", "visualize sales", "analyze age column"
+   - Watch AI-powered analysis in real-time
 
-| Feature                        | Description |
-|-------------------------------|-------------|
-| ✋ Hand Gesture Recognition    | Select rows, columns, or regions from a dataset using hand movements via webcam. |
-| 🧠 LLM Integration             | Ask questions like "Visualize the age distribution" , "Analyze correlation between Age and Survival" , "Visualize the selected columns" |
-| 📊 Automatic Visualizations   | Data plots are generated using Plotly, Matplotlib, or Seaborn. |
-| 🎙️ Voice-to-Text Interface    | Give commands via microphone using OpenAI Whisper or Google Speech Recognition. |
-| 🖥️ Dual-Screen UI             | Left: Interactive dataset viewer, Right: Actions & results from AI analysis. |
+## 🏗️ Core Components
 
----
+- **AI Assistant**: OpenAI-powered natural language processing
+- **Voice Recognition**: Speech-to-text with command parsing
+- **Hand Tracking**: MediaPipe-based gesture recognition
+- **UI Integration**: PyQt interface with interactive results
+- **Data Processing**: Automated analysis and visualization
 
-## 🧪 Tech Stack
+## 📊 Voice Commands
 
-| Component          | Technology |
-|--------------------|------------|
-| Frontend           | Streamlit |
-| Hand Tracking      | Mediapipe, OpenCV |
-| Voice Recognition  | Whisper, SpeechRecognition |
-| Language Model     | OpenAI GPT-4 (or GPT-4o) |
-| Data Manipulation  | Pandas, Numpy |
-| Machine Learning   | Scikit-learn|
-| Visualizations     | Plotly, Matplotlib |
+- **Data Analysis**: "describe data", "analyze [column]"
+- **Visualization**: "visualize [column]", "correlation matrix"
+- **Natural Language**: "tell me about this dataset", "what insights do you see?"
+
+## ⚙️ Configuration
+
+1. **Create environment file**:
+   ```bash
+   cp env.template .env
+   # Edit .env with your actual API key
+   ```
+
+2. **Secure Setup**: All sensitive data uses environment variables - never commit secrets!
+
+## 🔒 Security
+
+Before pushing to GitHub, run the security check:
+```bash
+python3 check_security.py
+```
+
+See `SECURITY.md` for detailed security guidelines.
+
+## 📄 License
+
+Educational and research use.

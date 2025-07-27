@@ -49,26 +49,36 @@ VOICE_CONFIG = {
     "pause_threshold": 0.8,
 }
 
-# LLM settings
-LLM_CONFIG = {
-    "model": "gpt-4o",
-    "temperature": 0.7,
-    "max_tokens": 1000,
-    "timeout": 30,
-}
+# LLM and AI Assistant settings
+# Import secure configuration
+try:
+    from .secure_config import SecureConfig
+    LLM_CONFIG = SecureConfig.load_llm_config()
+except ImportError:
+    # Fallback to basic configuration
+    LLM_CONFIG = {
+        "provider": "openai",
+        "model": "gpt-3.5-turbo",
+        "api_key": os.getenv("OPENAI_API_KEY", ""),
+        "temperature": 0.1,
+        "max_tokens": 1000,
+        "fallback_to_patterns": True,
+    }
 
-# Data processing settings
+# Data analysis settings
 DATA_CONFIG = {
-    "max_file_size_mb": 100,
     "supported_formats": [".csv", ".xlsx", ".json", ".parquet"],
-    "max_display_rows": 1000,
-    "max_display_columns": 50,
+    "max_file_size_mb": 100,
+    "sample_size_for_preview": 1000,
+    "auto_detect_types": True,
+    "cache_results": True,
 }
 
 # Visualization settings
-VIZ_CONFIG = {
-    "default_theme": "plotly_white",
+VISUALIZATION_CONFIG = {
+    "default_theme": "plotly_dark",
     "figure_width": 800,
     "figure_height": 600,
-    "color_palette": ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"],
+    "export_formats": ["png", "pdf", "svg", "html"],
+    "interactive": True,
 } 
