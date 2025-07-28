@@ -4,7 +4,8 @@ Main Window - PyQt Desktop Application
 
 Main window for the hands-free data science application with PyQt interface.
 Left panel: Data visualization and management
-Right panel: Camera feed with hand gesture detection
+Upper right panel: Small camera feed with hand gesture detection
+Lower right panel: AI action panel for voice recognition and LLM results
 """
 
 import sys
@@ -16,16 +17,17 @@ from PyQt5.QtGui import QFont, QPalette, QColor
 from .widgets.data_panel import DataPanel
 from .widgets.camera_panel import CameraPanel
 from .widgets.voice_panel import VoicePanel
+from .widgets.ai_action_panel import AIActionPanel
 from .widgets.status_bar import StatusBar
 
 
 class MainWindow(QMainWindow):
-    """Main application window with data and camera panels."""
+    """Main application window with data panel on left, webcam and AI panel on right."""
     
     def __init__(self):
         super().__init__()
         self.setWindowTitle("🧠🖐️ Hands-Free Data Science")
-        self.setGeometry(100, 100, 1400, 900)
+        self.setGeometry(100, 100, 1600, 1000)  # Slightly larger for new layout
         
         # Set application theme
         self.setup_theme()
@@ -33,7 +35,8 @@ class MainWindow(QMainWindow):
         # Initialize core components
         self.data_panel = None
         self.camera_panel = None
-        self.voice_panel = None
+        self.voice_panel = None  # Keep for compatibility but won't add to layout
+        self.ai_action_panel = None
         self.status_bar_widget = None
         
         # Setup UI
@@ -74,7 +77,7 @@ class MainWindow(QMainWindow):
         """)
     
     def setup_ui(self):
-        """Setup the main user interface."""
+        """Setup the main user interface with new layout."""
         # Create central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -84,25 +87,39 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(10)
         
-        # Create splitter for resizable panels
-        splitter = QSplitter(Qt.Horizontal)
-        main_layout.addWidget(splitter)
+        # Create main horizontal splitter (data panel left, right panel right)
+        main_splitter = QSplitter(Qt.Horizontal)
+        main_layout.addWidget(main_splitter)
         
-        # Create and add data panel (left side)
+        # Create and add data panel (left side - unchanged)
         self.data_panel = DataPanel()
-        splitter.addWidget(self.data_panel)
+        main_splitter.addWidget(self.data_panel)
         
-        # Create and add camera panel (center)
+        # Create right panel container with vertical splitter for webcam and AI panel
+        right_splitter = QSplitter(Qt.Vertical)
+        
+        # Create and add camera panel (upper right - smaller size)
         self.camera_panel = CameraPanel()
-        splitter.addWidget(self.camera_panel)
+        self.camera_panel.setMaximumHeight(350)  # Limit height for compact layout
+        self.camera_panel.setMinimumHeight(250)  # Ensure minimum usable size
+        right_splitter.addWidget(self.camera_panel)
         
-        # Create and add voice panel (right side)
+        # Create and add AI action panel (lower right)
+        self.ai_action_panel = AIActionPanel()
+        right_splitter.addWidget(self.ai_action_panel)
+        
+        # Set initial sizes for right panel (40% camera, 60% AI panel)
+        right_splitter.setSizes([140, 210])
+        
+        # Add right panel to main splitter
+        main_splitter.addWidget(right_splitter)
+        
+        # Set initial sizes for main splitter (60% data, 40% right panel)
+        main_splitter.setSizes([960, 640])
+        
+        # Create voice panel for compatibility (but don't add to layout)
+        # This ensures existing connections still work
         self.voice_panel = VoicePanel()
-        self.voice_panel.setMaximumWidth(350)  # Fixed width for voice panel
-        splitter.addWidget(self.voice_panel)
-        
-        # Set initial splitter sizes (50% data, 30% camera, 20% voice)
-        splitter.setSizes([700, 420, 280])
         
         # Setup status bar
         self.status_bar_widget = StatusBar()
@@ -119,14 +136,30 @@ class MainWindow(QMainWindow):
             print("✅ Connected gesture detection to data panel")
         
         # Connect gesture detection to voice panel for gesture-triggered voice recognition
+        # (Voice panel still handles the logic but AI panel displays results)
         if hasattr(self.camera_panel, 'gesture_detected') and hasattr(self.voice_panel, 'update_gesture_status'):
             self.camera_panel.gesture_detected.connect(self.handle_gesture_for_voice)
             print("✅ Connected gesture detection to voice panel")
         
-        # Connect voice commands to data panel for voice-controlled data operations
+        # Connect voice commands from voice panel to data panel for voice-controlled data operations
         if hasattr(self.voice_panel, 'command_parsed') and hasattr(self.data_panel, 'handle_voice_command'):
             self.voice_panel.command_parsed.connect(self.data_panel.handle_voice_command)
             print("✅ Connected voice commands to data panel")
+        
+        # NEW: Connect voice commands to AI action panel for display
+        if hasattr(self.voice_panel, 'command_parsed') and hasattr(self.ai_action_panel, 'handle_voice_command'):
+            self.voice_panel.command_parsed.connect(self.ai_action_panel.handle_voice_command)
+            print("✅ Connected voice commands to AI action panel")
+        
+        # NEW: Connect voice status to AI action panel
+        if hasattr(self.voice_panel, 'voice_status_changed') and hasattr(self.ai_action_panel, 'update_voice_status'):
+            self.voice_panel.voice_status_changed.connect(self.ai_action_panel.update_voice_status)
+            print("✅ Connected voice status to AI action panel")
+        
+        # NEW: Connect voice transcriptions to AI action panel
+        if hasattr(self.voice_panel, 'transcription_received') and hasattr(self.ai_action_panel, 'update_voice_transcription'):
+            self.voice_panel.transcription_received.connect(self.ai_action_panel.update_voice_transcription)
+            print("✅ Connected voice transcriptions to AI action panel")
         
         # Connect voice status to status bar
         if hasattr(self.voice_panel, 'voice_status_changed'):
@@ -139,13 +172,23 @@ class MainWindow(QMainWindow):
         # Connect camera panel status updates to status bar
         if hasattr(self.camera_panel, 'camera_status_changed'):
             self.camera_panel.camera_status_changed.connect(self.status_bar_widget.update_camera_status)
+        
+        # NEW: Connect AI action panel status to status bar
+        if hasattr(self.ai_action_panel, 'status_updated'):
+            self.ai_action_panel.status_updated.connect(self.status_bar_widget.update_status)
     
     def handle_gesture_for_voice(self, gesture_data):
-        """Handle gesture data for voice panel."""
+        """Handle gesture data for voice panel and AI action panel."""
         if self.voice_panel and gesture_data:
             gesture_name = gesture_data.get("gesture", "")
             confidence = gesture_data.get("confidence", 0.0)
+            
+            # Update voice panel (for processing logic)
             self.voice_panel.update_gesture_status(gesture_name, confidence)
+            
+            # Also notify AI action panel for display
+            if hasattr(self.ai_action_panel, 'add_to_history'):
+                self.ai_action_panel.add_to_history(f"Gesture detected: {gesture_name} ({confidence:.2f})")
     
     def update_interface(self):
         """Update interface elements periodically."""
@@ -166,6 +209,10 @@ class MainWindow(QMainWindow):
         # Cleanup voice panel resources
         if self.voice_panel:
             self.voice_panel.cleanup()
+        
+        # Cleanup AI action panel resources
+        if self.ai_action_panel:
+            self.ai_action_panel.cleanup()
         
         # Stop update timer
         if self.update_timer:

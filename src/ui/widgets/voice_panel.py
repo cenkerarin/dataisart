@@ -39,9 +39,13 @@ class VoicePanel(QWidget):
     command_parsed = pyqtSignal(dict)  # Emitted when a command is successfully parsed
     voice_status_changed = pyqtSignal(str)  # Status updates
     gesture_trigger_detected = pyqtSignal(str)  # When trigger gesture is detected
+    transcription_received = pyqtSignal(str)  # Emitted when transcription is received
     
     def __init__(self, parent=None):
         super().__init__(parent)
+        
+        # Debug: Show voice availability
+        print(f"🔊 Voice Panel - VOICE_AVAILABLE: {VOICE_AVAILABLE}")
         
         # Voice components
         self.voice_handler = None
@@ -316,12 +320,19 @@ class VoicePanel(QWidget):
     
     def update_gesture_status(self, gesture: str, confidence: float = 0.0):
         """Update current gesture status from camera panel."""
+        # Debug: Print all gestures for troubleshooting
+        print(f"🔍 Voice Panel - Gesture received: {gesture} (confidence: {confidence:.2f})")
+        
         # Set current_gesture to None if confidence is too low or gesture is "none"
-        self.current_gesture = gesture if (confidence > 0.7 and gesture != "none") else None
+        self.current_gesture = gesture if (confidence > 0.5 and gesture != "none") else None  # Lowered threshold
         
         if self.current_gesture:
             self.gesture_status_label.setText(f"✋ Gesture: {gesture.replace('_', ' ').title()} ({confidence:.2f})")
             self.gesture_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            
+            # Debug: Check if it's the trigger gesture
+            if gesture == self.trigger_gesture:
+                print(f"🎯 Voice Panel - Trigger gesture detected! ({self.trigger_gesture})")
         else:
             self.gesture_status_label.setText("✋ Gesture: None detected")
             self.gesture_status_label.setStyleSheet("color: #95a5a6;")
@@ -339,6 +350,7 @@ class VoicePanel(QWidget):
         
         # Check if trigger gesture is detected
         if self.current_gesture == self.trigger_gesture:
+            print(f"🎯 Voice Panel - Activating voice for gesture: {self.current_gesture}")
             if self.gesture_start_time is None:
                 self.gesture_start_time = current_time
                 self.activation_progress.setVisible(True)
@@ -376,11 +388,15 @@ class VoicePanel(QWidget):
     
     def activate_voice_recognition(self):
         """Activate voice recognition through gesture trigger."""
+        print(f"🚀 Voice Panel - activate_voice_recognition called! is_listening: {self.is_listening}")
+        
         if self.is_listening:
             return
         
         self.gesture_trigger_detected.emit(self.trigger_gesture)
         self.add_to_history("🎯 Gesture activation detected!")
+        
+        print(f"🔊 Voice Panel - voice_handler available: {self.voice_handler is not None}")
         
         if self.voice_handler and self.voice_handler.start_listening():
             self.is_listening = True
@@ -388,8 +404,10 @@ class VoicePanel(QWidget):
             self.voice_status_label.setText("🎤 Listening...")
             self.voice_status_label.setStyleSheet("color: #ff6b6b; font-weight: bold; animation: blink 1s infinite;")
             logger.info("Voice recognition activated by gesture")
+            print("✅ Voice Panel - Voice recognition started successfully!")
         else:
             self.add_to_history("❌ Failed to start voice recognition")
+            print("❌ Voice Panel - Failed to start voice recognition")
     
     def toggle_manual_listening(self):
         """Toggle manual voice recognition."""
@@ -444,6 +462,9 @@ class VoicePanel(QWidget):
     def on_transcription_received(self, text: str, confidence: float):
         """Handle transcription from voice recognition."""
         self.add_to_history(f"🎤 Transcribed: {text} (confidence: {confidence:.2f})")
+        
+        # Emit transcription for AI action panel
+        self.transcription_received.emit(f"{text} (confidence: {confidence:.2f})")
         
         # Parse the command
         if self.command_parser:
