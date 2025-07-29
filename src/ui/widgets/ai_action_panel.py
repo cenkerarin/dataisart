@@ -73,121 +73,52 @@ class AIActionPanel(QFrame):
         self.update_timer.start(1000)  # Update every second
         
     def setup_ui(self):
-        """Setup the unified AI action panel UI."""
+        """Setup the unified AI chat interface."""
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(8, 8, 8, 8)
         main_layout.setSpacing(8)
         
-        # Simple header - no status text
-        title_label = QLabel("🤖 AI Panel")
+        # Chat header with title and controls
+        header_layout = QHBoxLayout()
+        
+        title_label = QLabel("🤖 AI Chat")
         title_label.setFont(QFont("Arial", 14, QFont.Bold))
-        title_label.setStyleSheet("color: #ffffff; padding: 8px;")
-        title_label.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(title_label)
+        title_label.setStyleSheet("color: #ffffff;")
+        header_layout.addWidget(title_label)
         
-        # Create one unified scrollable content area
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setStyleSheet("""
-            QScrollArea {
-                border: 1px solid #555555;
-                border-radius: 5px;
-                background-color: #2a2a2a;
-            }
-            QScrollBar:vertical {
-                background-color: #3a3a3a;
-                width: 8px;
-                border-radius: 4px;
-            }
-            QScrollBar::handle:vertical {
-                background-color: #555555;
-                border-radius: 4px;
-                min-height: 20px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: #666666;
-            }
-        """)
+        header_layout.addStretch()
         
-        # Content widget for the scroll area
-        content_widget = QWidget()
-        content_layout = QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(10, 10, 10, 10)
-        content_layout.setSpacing(12)
-        
-        # Voice Recognition Section (integrated)
-        self.setup_voice_section(content_layout)
-        
-        # AI Analysis Section (integrated)
-        self.setup_analysis_section(content_layout)
-        
-        # Action History Section (integrated)
-        self.setup_history_section(content_layout)
-        
-        # Add stretch to push content to top
-        content_layout.addStretch()
-        
-        scroll.setWidget(content_widget)
-        main_layout.addWidget(scroll)
-
-    def setup_voice_section(self, layout):
-        """Setup integrated voice recognition section."""
         # Voice status indicator (compact)
-        voice_header = QHBoxLayout()
-        voice_icon = QLabel("🎤")
-        voice_icon.setStyleSheet("font-size: 16px;")
-        voice_header.addWidget(voice_icon)
+        self.voice_status_label = QLabel("🎤 Voice: Inactive")
+        self.voice_status_label.setStyleSheet("color: #888888; font-size: 11px;")
+        header_layout.addWidget(self.voice_status_label)
         
-        self.voice_status_label = QLabel("Voice: Inactive")
-        self.voice_status_label.setStyleSheet("color: #cccccc; font-weight: bold; font-size: 12px;")
-        voice_header.addWidget(self.voice_status_label)
-        voice_header.addStretch()
-        
-        layout.addLayout(voice_header)
-        
-        # Voice transcription display (compact)
-        self.voice_display = QTextEdit()
-        self.voice_display.setMaximumHeight(60)  # Smaller height
-        self.voice_display.setReadOnly(True)
-        self.voice_display.setStyleSheet("""
-            QTextEdit {
-                background-color: #1a1a1a;
+        # Clear chat button
+        clear_btn = QPushButton("Clear")
+        clear_btn.setMaximumWidth(50)
+        clear_btn.setMaximumHeight(24)
+        clear_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #444444;
                 color: #ffffff;
-                border: 1px solid #444444;
+                border: 1px solid #555555;
                 border-radius: 3px;
-                font-family: 'Courier New', monospace;
+                padding: 4px 8px;
                 font-size: 10px;
-                padding: 4px;
+            }
+            QPushButton:hover {
+                background-color: #555555;
             }
         """)
-        self.voice_display.setPlaceholderText("Voice transcriptions...")
-        layout.addWidget(self.voice_display)
+        clear_btn.clicked.connect(self.clear_chat)
+        header_layout.addWidget(clear_btn)
         
-        # Separator line
-        separator1 = QFrame()
-        separator1.setFrameShape(QFrame.HLine)
-        separator1.setStyleSheet("color: #444444;")
-        layout.addWidget(separator1)
-
-    def setup_analysis_section(self, layout):
-        """Setup integrated AI analysis section."""
-        # AI Analysis header (compact)
-        analysis_header = QHBoxLayout()
-        analysis_icon = QLabel("🧠")
-        analysis_icon.setStyleSheet("font-size: 16px;")
-        analysis_header.addWidget(analysis_icon)
-        
-        analysis_label = QLabel("AI Analysis")
-        analysis_label.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 12px;")
-        analysis_header.addWidget(analysis_label)
-        analysis_header.addStretch()
+        main_layout.addLayout(header_layout)
         
         # Progress bar for ongoing operations (initially hidden)
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
-        self.progress_bar.setMaximumHeight(4)
+        self.progress_bar.setMaximumHeight(3)
         self.progress_bar.setStyleSheet("""
             QProgressBar {
                 border: none;
@@ -199,127 +130,113 @@ class AIActionPanel(QFrame):
                 border-radius: 2px;
             }
         """)
-        analysis_header.addWidget(self.progress_bar)
+        main_layout.addWidget(self.progress_bar)
         
-        layout.addLayout(analysis_header)
-        
-        # Analysis display (main content area)
-        self.analysis_display = QTextEdit()
-        self.analysis_display.setReadOnly(True)
-        self.analysis_display.setStyleSheet("""
+        # Main chat area - unified conversation interface
+        self.chat_display = QTextEdit()
+        self.chat_display.setReadOnly(True)
+        self.chat_display.setStyleSheet("""
             QTextEdit {
                 background-color: #1a1a1a;
                 color: #ffffff;
                 border: 1px solid #444444;
-                border-radius: 3px;
+                border-radius: 6px;
                 font-family: 'Segoe UI', Arial, sans-serif;
-                font-size: 11px;
+                font-size: 12px;
                 line-height: 1.4;
-                padding: 8px;
+                padding: 12px;
             }
         """)
-        self.analysis_display.setPlaceholderText("AI analysis results will appear here...")
-        layout.addWidget(self.analysis_display)
-        
-        # Separator line
-        separator2 = QFrame()
-        separator2.setFrameShape(QFrame.HLine)
-        separator2.setStyleSheet("color: #444444;")
-        layout.addWidget(separator2)
+        self.chat_display.setPlaceholderText("🤖 AI Chat ready...\n\nVoice transcriptions, AI analysis, and actions will appear here as a conversation.")
+        main_layout.addWidget(self.chat_display)
 
-    def setup_history_section(self, layout):
-        """Setup integrated action history section."""
-        # History header with clear button
-        history_header = QHBoxLayout()
-        history_icon = QLabel("📋")
-        history_icon.setStyleSheet("font-size: 16px;")
-        history_header.addWidget(history_icon)
+    def add_message(self, message_type, content, metadata=None):
+        """Add a message to the unified chat interface."""
+        from datetime import datetime
         
-        history_label = QLabel("Action History")
-        history_label.setStyleSheet("color: #ffffff; font-weight: bold; font-size: 12px;")
-        history_header.addWidget(history_label)
+        timestamp = datetime.now().strftime("%H:%M:%S")
         
-        history_header.addStretch()
+        # Format message based on type
+        if message_type == "voice":
+            icon = "🎤"
+            title = "Voice"
+            color = "#00ff88"
+            formatted_content = content
+        elif message_type == "ai":
+            icon = "🧠"
+            title = "AI Analysis"
+            color = "#0078d4"
+            formatted_content = content
+        elif message_type == "action":
+            icon = "⚡"
+            title = "Action"
+            color = "#ffaa00"
+            formatted_content = content
+        elif message_type == "system":
+            icon = "ℹ️"
+            title = "System"
+            color = "#888888"
+            formatted_content = content
+        elif message_type == "error":
+            icon = "❌"
+            title = "Error"
+            color = "#ff4444"
+            formatted_content = content
+        else:
+            icon = "💬"
+            title = "Message"
+            color = "#cccccc"
+            formatted_content = content
         
-        # Clear history button (small and integrated)
-        clear_btn = QPushButton("Clear")
-        clear_btn.setMaximumWidth(50)
-        clear_btn.setMaximumHeight(20)
-        clear_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #444444;
-                color: #ffffff;
-                border: 1px solid #555555;
-                border-radius: 3px;
-                padding: 2px 6px;
-                font-size: 9px;
-            }
-            QPushButton:hover {
-                background-color: #555555;
-            }
-        """)
-        clear_btn.clicked.connect(self.clear_history)
-        history_header.addWidget(clear_btn)
+        # Create message HTML with chat-like styling
+        message_html = f"""
+        <div style="margin-bottom: 16px; border-left: 3px solid {color}; padding-left: 12px;">
+            <div style="color: {color}; font-weight: bold; font-size: 11px; margin-bottom: 4px;">
+                {icon} {title} <span style="color: #666666; font-weight: normal;">• {timestamp}</span>
+            </div>
+            <div style="color: #ffffff; line-height: 1.4;">
+                {formatted_content}
+            </div>
+        </div>
+        """
         
-        layout.addLayout(history_header)
+        # Append message to chat
+        cursor = self.chat_display.textCursor()
+        cursor.movePosition(cursor.End)
+        cursor.insertHtml(message_html)
         
-        # History display (compact)
-        self.history_display = QTextEdit()
-        self.history_display.setMaximumHeight(80)  # Smaller height
-        self.history_display.setReadOnly(True)
-        self.history_display.setStyleSheet("""
-            QTextEdit {
-                background-color: #1a1a1a;
-                color: #cccccc;
-                border: 1px solid #444444;
-                border-radius: 3px;
-                font-family: 'Courier New', monospace;
-                font-size: 9px;
-                padding: 4px;
-            }
-        """)
-        self.history_display.setPlaceholderText("Action history...")
-        layout.addWidget(self.history_display)
+        # Auto-scroll to bottom
+        self.chat_display.setTextCursor(cursor)
+        self.chat_display.ensureCursorVisible()
 
-    # Remove the old create_* methods as they're no longer needed
-    def create_voice_section(self):
-        """Legacy method - now integrated into main UI"""
-        pass
-        
-    def create_analysis_section(self):
-        """Legacy method - now integrated into main UI"""
-        pass
-        
-    def create_history_section(self):
-        """Legacy method - now integrated into main UI"""
-        pass
-    
+    def clear_chat(self):
+        """Clear the chat interface."""
+        self.chat_display.clear()
+        self.action_history.clear()
+        self.add_message("system", "Chat cleared")
+
+    # Update methods to use the unified chat interface
     @pyqtSlot(str)
     def update_voice_status(self, status):
         """Update voice recognition status."""
-        self.voice_status_label.setText(f"Voice: {status}")
+        self.voice_status_label.setText(f"🎤 Voice: {status}")
         if "listening" in status.lower():
-            self.voice_status_label.setStyleSheet("color: #00ff00;")
+            self.voice_status_label.setStyleSheet("color: #00ff88; font-size: 11px;")
         elif "processing" in status.lower():
-            self.voice_status_label.setStyleSheet("color: #ffaa00;")
+            self.voice_status_label.setStyleSheet("color: #ffaa00; font-size: 11px;")
         else:
-            self.voice_status_label.setStyleSheet("color: #cccccc;")
+            self.voice_status_label.setStyleSheet("color: #888888; font-size: 11px;")
     
     @pyqtSlot(str)
     def update_voice_transcription(self, transcription):
-        """Update voice transcription display."""
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        self.voice_display.append(f"[{timestamp}] {transcription}")
-        
-        # Auto-scroll to bottom
-        cursor = self.voice_display.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self.voice_display.setTextCursor(cursor)
+        """Update voice transcription in chat."""
+        self.add_message("voice", transcription)
     
     @pyqtSlot(dict)
     def handle_voice_command(self, command_data):
-        """Handle parsed voice command."""
-        self.add_to_history(f"Voice Command: {command_data.get('command', 'Unknown')}")
+        """Handle parsed voice command in chat."""
+        command = command_data.get('command', 'Unknown')
+        self.add_message("action", f"Voice Command: {command}")
         
         # Show processing
         self.show_processing("Processing voice command...")
@@ -330,63 +247,62 @@ class AIActionPanel(QFrame):
                 result = self.ai_assistant.process_command(command_data)
                 self.display_ai_result(result)
             except Exception as e:
-                self.display_error(f"Error processing command: {str(e)}")
+                self.add_message("error", f"Error processing command: {str(e)}")
         else:
-            self.display_message("Voice command received (AI processing not available)")
+            self.add_message("system", "Voice command received (AI processing not available)")
         
         self.hide_processing()
     
     def display_ai_result(self, result):
-        """Display AI analysis result."""
+        """Display AI analysis result in chat."""
         if not result:
             return
             
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        
         # Format result based on type
         if hasattr(result, 'action_type'):
-            self.analysis_display.append(f"\n[{timestamp}] AI Analysis:")
-            self.analysis_display.append(f"Action: {result.action_type}")
+            content = f"**Action:** {result.action_type}\n"
             
             if hasattr(result, 'result') and result.result:
-                self.analysis_display.append(f"Result: {result.result}")
+                content += f"**Result:** {result.result}\n"
                 
             if hasattr(result, 'explanation') and result.explanation:
-                self.analysis_display.append(f"Explanation: {result.explanation}")
+                content += f"**Explanation:** {result.explanation}\n"
                 
             if hasattr(result, 'confidence') and result.confidence:
-                self.analysis_display.append(f"Confidence: {result.confidence:.2f}")
+                content += f"**Confidence:** {result.confidence:.2f}"
         else:
-            self.analysis_display.append(f"\n[{timestamp}] AI Result: {str(result)}")
+            content = str(result)
         
-        # Auto-scroll to bottom
-        cursor = self.analysis_display.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self.analysis_display.setTextCursor(cursor)
-        
-        self.add_to_history(f"AI Analysis completed")
+        self.add_message("ai", content)
     
     def display_message(self, message):
-        """Display a general message."""
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        self.analysis_display.append(f"\n[{timestamp}] {message}")
-        
-        # Auto-scroll to bottom
-        cursor = self.analysis_display.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self.analysis_display.setTextCursor(cursor)
+        """Display a general message in chat."""
+        self.add_message("system", message)
     
     def display_error(self, error_message):
-        """Display error message."""
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        self.analysis_display.append(f"\n[{timestamp}] ERROR: {error_message}")
+        """Display error message in chat."""
+        self.add_message("error", error_message)
+    
+    def add_to_history(self, action):
+        """Add action to chat (replaces old history system)."""
+        self.add_message("action", action)
+
+    def clear_history(self):
+        """Legacy method - now calls clear_chat"""
+        self.clear_chat()
+
+    # Remove the old section setup methods
+    def create_voice_section(self):
+        """Legacy method - now integrated into chat"""
+        pass
         
-        # Auto-scroll to bottom
-        cursor = self.analysis_display.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self.analysis_display.setTextCursor(cursor)
+    def create_analysis_section(self):
+        """Legacy method - now integrated into chat"""
+        pass
         
-        self.add_to_history(f"Error: {error_message}")
+    def create_history_section(self):
+        """Legacy method - now integrated into chat"""
+        pass
     
     def show_processing(self, message="Processing..."):
         """Show processing indicator."""
@@ -400,30 +316,6 @@ class AIActionPanel(QFrame):
         self.progress_bar.setVisible(False)
         # self.status_label.setText("Ready") # Removed status_label
         # self.status_label.setStyleSheet("color: #00ff00;") # Removed status_label
-    
-    def add_to_history(self, action):
-        """Add action to history."""
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        self.action_history.append(f"[{timestamp}] {action}")
-        
-        # Limit history size
-        if len(self.action_history) > self.max_history:
-            self.action_history = self.action_history[-self.max_history:]
-        
-        # Update display
-        self.history_display.clear()
-        self.history_display.setText("\n".join(self.action_history[-10:]))  # Show last 10
-        
-        # Auto-scroll to bottom
-        cursor = self.history_display.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self.history_display.setTextCursor(cursor)
-    
-    def clear_history(self):
-        """Clear action history."""
-        self.action_history.clear()
-        self.history_display.clear()
-        self.add_to_history("History cleared")
     
     def update_display(self):
         """Update display elements periodically."""
