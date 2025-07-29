@@ -98,18 +98,18 @@ class MainWindow(QMainWindow):
         # Create right panel container with vertical splitter for webcam and AI panel
         right_splitter = QSplitter(Qt.Vertical)
         
-        # Create and add camera panel (upper right - smaller size)
+        # Create and add camera panel (upper right - bigger for better visibility)
         self.camera_panel = CameraPanel()
-        self.camera_panel.setMaximumHeight(350)  # Limit height for compact layout
-        self.camera_panel.setMinimumHeight(250)  # Ensure minimum usable size
+        self.camera_panel.setMaximumHeight(500)  # Increased from 350 for better visibility
+        self.camera_panel.setMinimumHeight(400)  # Increased from 250 for proper video size
         right_splitter.addWidget(self.camera_panel)
         
         # Create and add AI action panel (lower right)
         self.ai_action_panel = AIActionPanel()
         right_splitter.addWidget(self.ai_action_panel)
         
-        # Set initial sizes for right panel (40% camera, 60% AI panel)
-        right_splitter.setSizes([140, 210])
+        # Set initial sizes for right panel (50% camera, 50% AI panel) - more space for camera
+        right_splitter.setSizes([200, 200])
         
         # Add right panel to main splitter
         main_splitter.addWidget(right_splitter)

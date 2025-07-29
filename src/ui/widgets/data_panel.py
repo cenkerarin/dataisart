@@ -85,106 +85,156 @@ class DataPanel(QFrame):
         layout.setSpacing(10)
         
         # Title
-        title = QLabel("📊 Data Management")
+        title = QLabel("📊 Data Panel")
         title.setFont(QFont("Arial", 16, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
         
-        # Dataset controls
-        self.setup_dataset_controls(layout)
+        # Load data section (will be hidden when data is loaded)
+        self.setup_load_section(layout)
         
-        # Data preview
-        self.setup_data_preview(layout)
+        # Data display section
+        self.setup_data_display(layout)
     
-    def setup_dataset_controls(self, layout):
-        """Setup dataset loading and control widgets."""
-        controls_group = QGroupBox("Dataset Controls")
-        controls_layout = QVBoxLayout(controls_group)
+    def setup_load_section(self, layout):
+        """Setup data loading section that disappears when data is loaded."""
+        self.load_section = QGroupBox("Load Your Data")
+        self.load_section.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 2px solid #4CAF50;
+                border-radius: 8px;
+                margin-top: 10px;
+                padding-top: 15px;
+                background-color: rgba(76, 175, 80, 0.1);
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 8px 0 8px;
+                color: #4CAF50;
+            }
+        """)
+        load_layout = QVBoxLayout(self.load_section)
         
-        # Load dataset button
-        load_button = QPushButton("📁 Load Dataset")
-        load_button.clicked.connect(self.load_dataset)
-        load_button.setStyleSheet("""
+        # Load dataset button - prominent and centered
+        self.load_button = QPushButton("📁 Select Dataset File")
+        self.load_button.clicked.connect(self.load_dataset)
+        self.load_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
                 border: none;
                 color: white;
-                padding: 10px;
-                font-size: 14px;
-                border-radius: 5px;
+                padding: 15px 30px;
+                font-size: 16px;
+                font-weight: bold;
+                border-radius: 8px;
+                margin: 10px;
             }
             QPushButton:hover {
                 background-color: #45a049;
+                transform: scale(1.02);
+            }
+            QPushButton:pressed {
+                background-color: #3d8b40;
             }
         """)
-        controls_layout.addWidget(load_button)
+        load_layout.addWidget(self.load_button)
         
-        # Dataset info
-        self.dataset_info = QLabel("No dataset loaded")
-        self.dataset_info.setStyleSheet("color: #cccccc; padding: 5px;")
-        controls_layout.addWidget(self.dataset_info)
-        
-        # Gesture control instructions
-        gesture_instructions = QLabel(
-            "🖐️ Gesture Controls:\n"
-            "👆 Point → Scroll Down\n"
-            "🤏 Pinch → Scroll Up\n"
-            "✋ Open Hand → Scroll Right\n"
-            "✊ Fist → Scroll Left\n"
-            "(Need 75%+ confidence for 0.4s)"
-        )
-        gesture_instructions.setStyleSheet("""
+        # Supported formats info
+        formats_info = QLabel("Supports: CSV, Excel (.xlsx), JSON, Parquet files")
+        formats_info.setStyleSheet("""
             color: #888888; 
-            padding: 8px; 
-            background-color: #333333; 
-            border-radius: 5px; 
-            font-size: 11px;
-            line-height: 1.3;
+            padding: 5px;
+            font-style: italic;
+            text-align: center;
         """)
-        controls_layout.addWidget(gesture_instructions)
+        formats_info.setAlignment(Qt.AlignCenter)
+        load_layout.addWidget(formats_info)
         
-        # Gesture status indicator
-        self.gesture_status = QLabel("🤚 Ready for gestures")
-        self.gesture_status.setStyleSheet("""
-            color: #4CAF50; 
-            padding: 5px; 
-            background-color: #2d2d2d; 
-            border-radius: 3px; 
-            font-size: 12px;
-            font-weight: bold;
-        """)
-        controls_layout.addWidget(self.gesture_status)
-        
-        layout.addWidget(controls_group)
+        layout.addWidget(self.load_section)
     
-    def setup_data_preview(self, layout):
-        """Setup data preview table."""
-        preview_group = QGroupBox("Data Preview")
-        preview_layout = QVBoxLayout(preview_group)
+    def setup_data_display(self, layout):
+        """Setup clean data display section."""
+        # Data container (initially hidden)
+        self.data_container = QFrame()
+        self.data_container.setVisible(False)
+        data_layout = QVBoxLayout(self.data_container)
+        data_layout.setContentsMargins(0, 0, 0, 0)
+        data_layout.setSpacing(8)
         
-        # Data table
+        # Dataset info header (clean and minimal)
+        self.dataset_header = QFrame()
+        self.dataset_header.setStyleSheet("""
+            QFrame {
+                background-color: #3a3a3a;
+                border-radius: 6px;
+                padding: 5px;
+            }
+        """)
+        header_layout = QHBoxLayout(self.dataset_header)
+        header_layout.setContentsMargins(10, 8, 10, 8)
+        
+        self.dataset_info = QLabel("Dataset loaded")
+        self.dataset_info.setStyleSheet("""
+            color: #ffffff; 
+            font-weight: bold;
+            font-size: 14px;
+        """)
+        header_layout.addWidget(self.dataset_info)
+        
+        # Add new dataset button (small, right-aligned)
+        self.new_dataset_btn = QPushButton("📁 Load Different Dataset")
+        self.new_dataset_btn.clicked.connect(self.load_dataset)
+        self.new_dataset_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #555555;
+                border: none;
+                color: white;
+                padding: 6px 12px;
+                font-size: 11px;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #666666;
+            }
+        """)
+        header_layout.addWidget(self.new_dataset_btn)
+        
+        data_layout.addWidget(self.dataset_header)
+        
+        # Data table (clean and focused)
         self.data_table = QTableWidget()
         self.data_table.setAlternatingRowColors(True)
         self.data_table.setStyleSheet("""
             QTableWidget {
                 background-color: #2b2b2b;
-                alternate-background-color: #353535;
+                alternate-background-color: #323232;
                 color: #ffffff;
-                gridline-color: #555555;
+                gridline-color: #444444;
                 selection-background-color: #4CAF50;
+                border: 1px solid #555555;
+                border-radius: 4px;
             }
             QHeaderView::section {
                 background-color: #404040;
                 color: #ffffff;
-                padding: 5px;
+                padding: 8px;
                 border: 1px solid #555555;
+                font-weight: bold;
+            }
+            QTableWidget::item {
+                padding: 4px;
+                border: none;
+            }
+            QTableWidget::item:selected {
+                background-color: #4CAF50;
+                color: white;
             }
         """)
-        preview_layout.addWidget(self.data_table)
+        data_layout.addWidget(self.data_table)
         
-        layout.addWidget(preview_group)
-    
-
+        layout.addWidget(self.data_container)
     
     def load_dataset(self):
         """Load a dataset file."""
@@ -204,6 +254,8 @@ class DataPanel(QFrame):
                     self.current_dataset = self.data_manager.current_dataset
                     self.update_dataset_display()
                     self.status_updated.emit(f"✅ Dataset loaded: {Path(file_path).name}")
+                    self.load_section.setVisible(False) # Hide load section
+                    self.data_container.setVisible(True) # Show data container
                 else:
                     self.status_updated.emit("❌ Failed to load dataset")
                     
@@ -216,25 +268,36 @@ class DataPanel(QFrame):
             return
         
         try:
-            # Update dataset info
+            # Update dataset info with cleaner display
             shape = self.current_dataset.shape
-            self.dataset_info.setText(f"Dataset: {shape[0]} rows × {shape[1]} columns")
+            self.dataset_info.setText(f"📊 {shape[0]:,} rows × {shape[1]} columns")
             
-            # Update data table (first 100 rows)
+            # Update data table (first 100 rows for performance)
             display_data = self.current_dataset.head(100)
             
             self.data_table.setRowCount(len(display_data))
             self.data_table.setColumnCount(len(display_data.columns))
             self.data_table.setHorizontalHeaderLabels([str(col) for col in display_data.columns])
             
-            # Populate table
+            # Populate table with better formatting
             for i, row in enumerate(display_data.itertuples(index=False)):
                 for j, value in enumerate(row):
-                    item = QTableWidgetItem(str(value))
+                    # Format values nicely
+                    if pd.isna(value):
+                        display_value = "—"  # Better null display
+                    elif isinstance(value, float):
+                        display_value = f"{value:.3f}" if abs(value) < 1000 else f"{value:.2e}"
+                    else:
+                        display_value = str(value)
+                    
+                    item = QTableWidgetItem(display_value)
                     self.data_table.setItem(i, j, item)
             
-            # Auto-resize columns
+            # Auto-resize columns but limit max width
             self.data_table.resizeColumnsToContents()
+            for i in range(self.data_table.columnCount()):
+                if self.data_table.columnWidth(i) > 200:
+                    self.data_table.setColumnWidth(i, 200)
             
         except Exception as e:
             self.status_updated.emit(f"❌ Error updating display: {str(e)}")
@@ -347,15 +410,15 @@ class DataPanel(QFrame):
                     self.stop_continuous_scrolling()  # Stop any previous scrolling
                     
                     self.status_updated.emit(f"🖐️ Detected {gesture_name} ({confidence:.2f}) - Starting...")
-                    self.gesture_status.setText(f"⏳ {gesture_name.replace('_', ' ').title()} - starting...")
-                    self.gesture_status.setStyleSheet("""
-                        color: #FFC107; 
-                        padding: 5px; 
-                        background-color: #2d2d2d; 
-                        border-radius: 3px; 
-                        font-size: 12px;
-                        font-weight: bold;
-                    """)
+                    # self.gesture_status.setText(f"⏳ {gesture_name.replace('_', ' ').title()} - starting...") # Removed gesture status
+                    # self.gesture_status.setStyleSheet(""" # Removed gesture status
+                    #     color: #FFC107; 
+                    #     padding: 5px; 
+                    #     background-color: #2d2d2d; 
+                    #     border-radius: 3px; 
+                    #     font-size: 12px;
+                    #     font-weight: bold;
+                    # """) # Removed gesture status
                     return
                 
                 # Check if we've held the gesture long enough to start continuous scrolling
@@ -367,28 +430,28 @@ class DataPanel(QFrame):
                         self.start_continuous_scrolling()
                         
                         self.status_updated.emit(f"▶️ Scrolling with {gesture_name} ({confidence:.2f})")
-                        confidence_bar = "█" * int(confidence * 10)  # Visual confidence indicator
-                        self.gesture_status.setText(f"▶️ {gesture_name.replace('_', ' ').title()} active {confidence_bar}")
-                        self.gesture_status.setStyleSheet("""
-                            color: #4CAF50; 
-                            padding: 5px; 
-                            background-color: #2d2d2d; 
-                            border-radius: 3px; 
-                            font-size: 12px;
-                            font-weight: bold;
-                        """)
+                        # confidence_bar = "█" * int(confidence * 10) # Removed confidence bar
+                        # self.gesture_status.setText(f"▶️ {gesture_name.replace('_', ' ').title()} active {confidence_bar}") # Removed confidence bar
+                        # self.gesture_status.setStyleSheet(""" # Removed confidence bar
+                        #     color: #4CAF50; 
+                        #     padding: 5px; 
+                        #     background-color: #2d2d2d; 
+                        #     border-radius: 3px; 
+                        #     font-size: 12px;
+                        #     font-weight: bold;
+                        # """) # Removed confidence bar
                 else:
                     # Show shorter countdown for faster response
                     remaining = self.gesture_hold_time - hold_duration
-                    self.gesture_status.setText(f"⏳ {gesture_name.replace('_', ' ').title()} - {remaining:.1f}s")
-                    self.gesture_status.setStyleSheet("""
-                        color: #FF9800; 
-                        padding: 5px; 
-                        background-color: #2d2d2d; 
-                        border-radius: 3px; 
-                        font-size: 12px;
-                        font-weight: bold;
-                    """)
+                    # self.gesture_status.setText(f"⏳ {gesture_name.replace('_', ' ').title()} - {remaining:.1f}s") # Removed gesture status
+                    # self.gesture_status.setStyleSheet(""" # Removed gesture status
+                    #     color: #FF9800; 
+                    #     padding: 5px; 
+                    #     background-color: #2d2d2d; 
+                    #     border-radius: 3px; 
+                    #     font-size: 12px;
+                    #     font-weight: bold;
+                    # """) # Removed gesture status
                     
             else:
                 # Stop scrolling if confidence drops or gesture changes
@@ -396,27 +459,27 @@ class DataPanel(QFrame):
                 self.gesture_start_time = None
                 self.last_executed_gesture = None
                 
-                if confidence < self.gesture_confidence_threshold and hasattr(self, 'gesture_status'):
-                    if confidence > 0.5:  # Show low confidence warning
-                        self.gesture_status.setText(f"⚠️ Low confidence: {confidence:.2f}")
-                        self.gesture_status.setStyleSheet("""
-                            color: #FF5722; 
-                            padding: 5px; 
-                            background-color: #2d2d2d; 
-                            border-radius: 3px; 
-                            font-size: 12px;
-                            font-weight: bold;
-                        """)
-                    else:
-                        self.gesture_status.setText("🤚 Ready for gestures")
-                        self.gesture_status.setStyleSheet("""
-                            color: #4CAF50; 
-                            padding: 5px; 
-                            background-color: #2d2d2d; 
-                            border-radius: 3px; 
-                            font-size: 12px;
-                            font-weight: bold;
-                        """)
+                # if confidence < self.gesture_confidence_threshold and hasattr(self, 'gesture_status'): # Removed gesture status
+                #     if confidence > 0.5:  # Show low confidence warning # Removed gesture status
+                #         self.gesture_status.setText(f"⚠️ Low confidence: {confidence:.2f}") # Removed gesture status
+                #         self.gesture_status.setStyleSheet(""" # Removed gesture status
+                #             color: #FF5722; 
+                #             padding: 5px; 
+                #             background-color: #2d2d2d; 
+                #             border-radius: 3px; 
+                #             font-size: 12px;
+                #             font-weight: bold;
+                #         """) # Removed gesture status
+                #     else: # Removed gesture status
+                #         self.gesture_status.setText("🤚 Ready for gestures") # Removed gesture status
+                #         self.gesture_status.setStyleSheet(""" # Removed gesture status
+                #             color: #4CAF50; 
+                #             padding: 5px; 
+                #             background-color: #2d2d2d; 
+                #             border-radius: 3px; 
+                #             font-size: 12px;
+                #             font-weight: bold;
+                #         """) # Removed gesture status
         
         except Exception as e:
             self.stop_continuous_scrolling()
@@ -505,24 +568,13 @@ class DataPanel(QFrame):
         pass
     
     def reset_gesture_status(self):
-        """Reset gesture status indicator to ready state."""
+        """Reset gesture state (UI gestures removed but functionality preserved)."""
         # Stop any continuous scrolling
         self.stop_continuous_scrolling()
         
         # Reset gesture tracking
         self.gesture_start_time = None
         self.last_executed_gesture = None
-        
-        if hasattr(self, 'gesture_status'):
-            self.gesture_status.setText("🤚 Ready for gestures")
-            self.gesture_status.setStyleSheet("""
-                color: #4CAF50; 
-                padding: 5px; 
-                background-color: #2d2d2d; 
-                border-radius: 3px; 
-                font-size: 12px;
-                font-weight: bold;
-            """)
     
     def cleanup(self):
         """Clean up resources when panel is destroyed."""
