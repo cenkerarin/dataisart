@@ -40,8 +40,7 @@ class AIActionPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFrameStyle(QFrame.StyledPanel)
-        self.setMinimumHeight(300)
-        self.setMaximumHeight(600)
+        # Remove size constraints to allow full expansion
         
         # AI assistant integration
         self.ai_assistant = None

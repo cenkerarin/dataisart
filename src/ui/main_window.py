@@ -27,7 +27,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("🧠🖐️ Hands-Free Data Science")
-        self.setGeometry(100, 100, 1600, 1000)  # Slightly larger for new layout
+        self.setGeometry(50, 50, 1800, 1200)  # Larger window for better panel coverage
         
         # Set application theme
         self.setup_theme()
@@ -82,40 +82,50 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         
-        # Create main layout
+        # Create main layout with minimal margins to use full space
         main_layout = QHBoxLayout(central_widget)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(5, 5, 5, 5)  # Reduced margins
+        main_layout.setSpacing(5)  # Reduced spacing
         
-        # Create main horizontal splitter (data panel left, right panel right)
+        # Create main horizontal splitter (AI panel left, right panel right)
         main_splitter = QSplitter(Qt.Horizontal)
         main_layout.addWidget(main_splitter)
         
-        # Create and add data panel (left side - unchanged)
-        self.data_panel = DataPanel()
-        main_splitter.addWidget(self.data_panel)
+        # Create and add AI action panel (left side - now prominent)
+        self.ai_action_panel = AIActionPanel()
+        self.ai_action_panel.setMinimumWidth(400)  # Ensure minimum usable width
+        main_splitter.addWidget(self.ai_action_panel)
         
-        # Create right panel container with vertical splitter for webcam and AI panel
+        # Create right panel container with vertical splitter for webcam and data panel
         right_splitter = QSplitter(Qt.Vertical)
         
-        # Create and add camera panel (upper right - bigger for better visibility)
+        # Create and add camera panel (upper right - remove size constraints)
         self.camera_panel = CameraPanel()
-        self.camera_panel.setMaximumHeight(500)  # Increased from 350 for better visibility
-        self.camera_panel.setMinimumHeight(400)  # Increased from 250 for proper video size
+        # Remove height constraints to allow proper sizing
+        self.camera_panel.setMinimumHeight(200)  # Just minimal constraint
         right_splitter.addWidget(self.camera_panel)
         
-        # Create and add AI action panel (lower right)
-        self.ai_action_panel = AIActionPanel()
-        right_splitter.addWidget(self.ai_action_panel)
+        # Create and add data panel (lower right - moved from left)
+        self.data_panel = DataPanel()
+        self.data_panel.setMinimumHeight(200)  # Ensure minimum usable height
+        right_splitter.addWidget(self.data_panel)
         
-        # Set initial sizes for right panel (50% camera, 50% AI panel) - more space for camera
-        right_splitter.setSizes([200, 200])
+        # Set initial sizes for right panel using proportional values
+        # Get total height and distribute proportionally
+        total_height = 1200  # Updated window height
+        camera_height = int(total_height * 0.45)  # 45% for camera
+        data_height = int(total_height * 0.55)    # 55% for data
+        right_splitter.setSizes([camera_height, data_height])
         
         # Add right panel to main splitter
         main_splitter.addWidget(right_splitter)
         
-        # Set initial sizes for main splitter (60% data, 40% right panel)
-        main_splitter.setSizes([960, 640])
+        # Set initial sizes for main splitter using proportional values
+        # Get total width and distribute proportionally  
+        total_width = 1800  # Updated window width
+        ai_width = int(total_width * 0.6)      # 60% for AI chat
+        right_width = int(total_width * 0.4)   # 40% for right panel
+        main_splitter.setSizes([ai_width, right_width])
         
         # Create voice panel for compatibility (but don't add to layout)
         # This ensures existing connections still work

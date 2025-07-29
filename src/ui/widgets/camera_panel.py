@@ -192,7 +192,8 @@ class CameraPanel(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFrameStyle(QFrame.StyledPanel)
-        self.setMinimumWidth(500)
+        # Remove excessive width constraint to allow better sizing
+        self.setMinimumWidth(300)
         
         # Camera worker
         self.camera_worker = CameraWorker()
