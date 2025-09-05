@@ -1,4 +1,4 @@
-# 🧠🖐️ Hands-Free Data Science
+# Hands-Free Data Science
 
 An innovative application that combines **hand gesture recognition** and **voice commands** with **AI-powered data analysis** for hands-free data science workflows.
 
